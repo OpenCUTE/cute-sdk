@@ -1,24 +1,34 @@
 # CUTE-SDK Timeline
 
-## Phase 0: 冻结 HWConfig / Test / Trace 抽象和 Schema
+## Phase 0: 冻结 ChipyardConfig / HWConfig / Test / Trace 抽象和 Schema
 
 **状态**: `pending`
 
-**目标**: 定义三大对象的手写入口，使框架能静态回答 target 匹配、capability、trace level 问题。
+**目标**: 定义 CUTEFPEVersion / CUTEISAVersion / VectorVersion / 薄 ChipyardConfig manifest / HWConfig / Test / Trace 的入口边界，使框架能静态回答 target 匹配、capability、trace level 问题。Manifest 是软件协作契约和 runner 入口；Chipyard Config 的结构事实长期由 Chipyard exporter 导出，不在 manifest 中手抄；后续强一致性 check 用 exporter facts/header fingerprint 防止二者漂移。
 
 | Task | 内容 | 状态 |
 |------|------|------|
 | 0.1 | 创建 `cute-sdk/` 目录骨架 | `pending` |
-| 0.2 | 定义 `configs/schemas/hwconfig.schema.json` | `pending` |
-| 0.3 | 创建样板 `configs/hwconfigs/cute2tops_scp64_dramsim32.yaml` | `pending` |
-| 0.4 | 定义 `configs/schemas/project.schema.json` | `pending` |
-| 0.5 | 创建 `cute-sdk/runtime/cute_runtime/project.yaml` | `pending` |
-| 0.6 | 创建 `cute-sdk/tensor_ops/matmul/project.yaml` | `pending` |
-| 0.7 | 定义 `configs/schemas/trace_filter.schema.json` + `tools/trace/format_spec.md` | `pending` |
-| 0.8 | 创建占位 `configs/trace_filters/*.yaml` | `pending` |
-| 0.9 | 实现 `tools/runner/cute-check-config.py` | `pending` |
+| 0.2 | 定义 `configs/schemas/chipyard_config.schema.json` | `pending` |
+| 0.3 | 定义 `configs/schemas/cute_fpe_version.schema.json` | `pending` |
+| 0.4 | 定义 `configs/schemas/cute_isa_version.schema.json` | `pending` |
+| 0.5 | 定义 `configs/schemas/vector_version.schema.json` | `pending` |
+| 0.6 | 定义瘦版 `configs/schemas/hwconfig.schema.json` | `pending` |
+| 0.7 | 创建样板 `configs/cute_fpe_versions/*.yaml`、`configs/cute_isa_versions/*.yaml`、`configs/vector_versions/*.yaml`、`configs/chipyard_configs/*.yaml` 和 `configs/hwconfigs/*.yaml` | `pending` |
+| 0.8 | 定义 `configs/schemas/project.schema.json` | `pending` |
+| 0.9 | 创建 `cute-sdk/runtime/cute_runtime/project.yaml` | `pending` |
+| 0.10 | 创建 `cute-sdk/tensor_ops/matmul/project.yaml` | `pending` |
+| 0.11 | 定义 `configs/schemas/trace_filter.schema.json` + `trace/format_spec.md` | `pending` |
+| 0.12 | 创建占位 `configs/trace_filters/*.yaml` | `pending` |
+| 0.13 | 实现 `tools/runner/cute-check-config.py`，做 manifest/schema/reference 检查和 target matcher；不反向解析完整 Chipyard Config | `pending` |
+| 0.14 | TODO：Chipyard exporter 任务占位，后续生成 `chipyard_config.extracted.json` | `pending` |
+| 0.15 | Task 8 TODO：细化 `trace/func` 和 `trace/perf` 的 parser/filter/model 实现任务 | `pending` |
 
 **验收**:
+- [ ] `cute-check-config.py --chipyard-config` 通过 manifest/reference 校验
+- [ ] `cute-check-config.py` 能确认 `compatibility.fpe.version` 可解析，并展开 datatype set；不读取 Scala/header
+- [ ] `cute-check-config.py` 能确认 `compatibility.isa.version` 可解析，并展开 instruction set；不读取 Scala/header
+- [ ] `cute-check-config.py` 能确认 `compatibility.vector.version` 可解析，并展开 VectorVersion features
 - [ ] `cute-check-config.py --hwconfig` 通过校验
 - [ ] `cute-check-config.py --project` 通过校验
 - [ ] `cute-check-config.py --scan` 输出 target 匹配矩阵
@@ -69,6 +79,7 @@
 | 2.5 | 实现 `tools/runner/cute-gen-golden.py` | `pending` |
 | 2.6 | 实现 `tools/verify/cute_verify.py` | `pending` |
 | 2.7 | Runner 扩展：golden 生成 + verify | `pending` |
+| 2.8 | TODO：评估高级模板/模版编程，用于 variant 专用代码、datatype/layout dispatch 和 tensor op wrapper 生成 | `pending` |
 
 **验收**:
 - [ ] 测试代码 ~15 行（对比现有 ~60 行）
@@ -90,13 +101,13 @@
 | 3.1 | 选择 layer 样板（ResNet conv 或 LLaMA FFN） | `pending` |
 | 3.2 | 实现 `cute-sdk/include/cute_layer.h` | `pending` |
 | 3.3 | 实现 layer test driver | `pending` |
-| 3.4 | 实现 `tools/trace/parser.py` + `tools/trace/func/tensor_model.py` | `pending` |
+| 3.4 | 实现 `trace/parser.py` + `trace/func/tensor_model.py` | `pending` |
 | 3.5 | 实现 trace-driven verify 路径 | `pending` |
 
 **验收**:
 - [ ] Layer op 复用 tensor op lib
 - [ ] Trace parser 能解析 legacy `CMemoryLoader_Store`
-- [ ] `F1_store` 能从 trace 重建 D tensor
+- [ ] `Level2_mem_cute` 能从 `cute_loadstore` trace 重建 D tensor
 
 **详细计划**: `plans/phase3_layer_test_op_lib.md`
 
@@ -112,7 +123,7 @@
 |------|------|------|
 | 4.1 | 定义 LLaMA FFN 融合语义 | `pending` |
 | 4.2 | 实现 `cute-sdk/fuse_layer_ops/llama_ffn_fused/` | `pending` |
-| 4.3 | 实现 `tools/trace/func/fused_model.py` | `pending` |
+| 4.3 | 实现 `trace/func/fused_model.py` | `pending` |
 | 4.4 | 融合 vs 非融合对比 | `pending` |
 
 **验收**:
