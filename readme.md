@@ -13,7 +13,14 @@ cute-sdk/cuteisa/
 └── cute_isa_v1/
     ├── instruction.h       # C 头文件（指令编码、funct、宏定义）
     ├── isa.json            # 结构化 ISA 定义（cuteqemu 消费）
+    ├── cute_fpe.h          # datatype / FPE 相关宏定义
     └── isa_summary.md      # 人类可读的指令集摘要
+```
+
+生成命令：
+
+```bash
+python3 tools/runner/cute-gen-cuteisa.py --verbose
 ```
 
 消费关系：

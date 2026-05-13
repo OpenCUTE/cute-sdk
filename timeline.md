@@ -152,12 +152,10 @@ HWConfig / ChipyardConfig / 版本 manifests / JSON Schema / CUTETrace catalog +
 | 6.3 | layer test driver | `pending` |
 | 6.4 | nvwa 生成 layer 级 golden | `pending` |
 | 6.5 | memverify 验证 layer 输出 | `pending` |
-| 6.6 | Trace-driven 验证路径（Level2_mem_cute） | `pending` |
 
 **验收**:
 - [ ] Layer op 复用 tensor op lib
 - [ ] Layer 输出与 golden bit 级一致
-- [ ] Trace 能重建 D tensor
 
 ---
 
@@ -193,12 +191,12 @@ HWConfig / ChipyardConfig / 版本 manifests / JSON Schema / CUTETrace catalog +
 | 8.2 | 实现 `cutelib/model/include/cute_model.h` | `pending` |
 | 8.3 | model test driver | `pending` |
 | 8.4 | nvwa 生成 model 级 golden（tolerance 模式） | `pending` |
-| 8.5 | 端到端 profile（Top-Down 分析） | `pending` |
 
 **验收**:
 - [ ] 至少一个 model variant 能运行
-- [ ] Layer breakdown 显示各层 cycle 占比
-- [ ] Fused vs non-fused 对比有数据
+- [ ] Model 输出与 golden 对齐
+
+> **推迟**: 端到端 profile（Top-Down 分析）在正确性全部验证完后再做。
 
 ---
 
