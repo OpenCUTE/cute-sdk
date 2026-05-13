@@ -62,6 +62,16 @@ configs/cute_isa_versions/cute_isa_v1.yaml（真相源）
 - 统一的 golden tensor 格式
 - 差异报告（mismatch 位置、期望值、实际值）
 
+### ops — Op Spec 契约层
+
+独立于实现和测试的公共 op 接口定义。每个 op 用 YAML 描述其输入、输出、属性和计算语义（类似 ONNX OpSchema）。case manifest 引用 op spec 并绑定具体参数，形成 test case。
+
+```text
+op spec（契约：这个 op 是什么）
+  ↑ 实现它        ↑ 验证它        ↑ 实例化它
+cutelib/        tests/        case manifest（这组具体参数下应该产出什么）
+```
+
 ### cutelib — 分层库函数
 
 涵盖当前 ISA 下所有可用库函数及开发全环节（golden 源、验证脚本、库包装）。逐级依赖上级库实现。
@@ -76,6 +86,7 @@ model lib           模型级组合与验证
 
 每一级包含：
 - **库实现**：C 头文件 + 源文件，编译为 .riscv 运行在目标板
+- **Op Spec**：`ops/` 中定义的接口契约，lib 实现必须满足 spec
 - **Golden 源**：nvwa 生成的参考输出
 - **验证脚本**：memverify 驱动的 bit 级比对
 
@@ -98,15 +109,26 @@ cutelib 开发 ──────┤
 cute-sdk/
 ├── cuteisa/            # ISA artifacts（instruction.h / isa.json）
 │   └── cute_isa_v1/
+├── ops/                # Op Spec 契约层（op 的语义定义，独立于实现和测试）
+│   ├── tensor/         #   tensor 级 op（matmul / conv）
+│   ├── layer/          #   layer 级 op（conv2d_layer / ffn / attention）
+│   └── model/          #   model 级 op
 ├── cuteqemu/           # 功能级模拟器
 ├── nvwa/               # Golden 生成与多平台对齐
 ├── memverify/          # 内存比对引擎
-├── cutelib/            # 分层库函数
+├── cutelib/            # 分层库函数（实现 ops/ 中定义的 op spec）
 │   ├── runtime/        #   runtime lib
 │   ├── tensor/         #   tensor lib
 │   ├── layer/          #   layer lib
 │   ├── fusion/         #   fusion lib
 │   └── model/          #   model lib
+├── tests/              # 测试用例（case manifest 驱动）
+│   ├── runtime/
+│   ├── tensor/
+│   ├── layer/
+│   └── model/
+├── golden/             # Golden 参考数据
+│   └── manual/         #   人工 golden（从 cutetest .h 文件导入）
 ├── readme.md
 └── timeline.md
 ```
@@ -121,8 +143,11 @@ CUTE/
 ├── chipyard/           # Chipyard 硬件子仓库
 └── cute-sdk/           # ← 本仓库：软件全栈
       ├── cuteisa          消费 configs/cute_isa_versions → 生成 instruction.h + isa.json
+      ├── ops              op spec 契约层，定义每个 op 的语义和接口
       ├── cuteqemu         消费 cuteisa/isa.json
       ├── nvwa             为 cutelib 生成 golden
       ├── memverify        消费 trace 解码结果 + xDMA 数据 + cuteqemu 快照
-      └── cutelib          消费 cuteisa/instruction.h，编译为 .riscv
+      ├── cutelib          消费 cuteisa/instruction.h，实现 ops/ 定义的 op spec
+      ├── tests            引用 ops/ spec + golden manifest 驱动测试
+      └── golden           golden 参考数据（manual / nvwa）
 ```

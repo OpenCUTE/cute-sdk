@@ -297,9 +297,11 @@ memverify 第一版只做 bit-exact memory compare，不做浮点语义 toleranc
 
 ## Phase 0：迁移基线和资产清单
 
+详细执行计划见 [phase0_baseline_and_inventory.md](phase0_baseline_and_inventory.md)。
+
 目标：
 
-冻结第一批迁移范围，并保持所有 case 都能追溯回 `cutetest/`。
+冻结第一批迁移范围，并保持所有 case 都能追溯回 `cutetest/`。定义 op spec 契约层，建立 op spec + case manifest + golden manifest 三层分离的组织结构。
 
 任务：
 
@@ -308,13 +310,31 @@ memverify 第一版只做 bit-exact memory compare，不做浮点语义 toleranc
 | 0.1 | 从 `configs/cute_isa_versions/*.yaml` 生成 cuteisa artifacts | `cute-sdk/cuteisa/cute_isa_v1/` |
 | 0.2 | 建立 cutetest 迁移矩阵 | `plans/cutetest_migration_matrix.md` |
 | 0.3 | 选定第一批 smoke cases | runtime hello、INT8 matmul、一个 blockscale dtype matmul |
-| 0.4 | 记录旧测试路径、dtype、shape、bias mode、输出 tensor | 每个 case 的 manifest 草案 |
+| 0.4 | 定义 op spec + case manifest + golden manifest | `ops/tensor/matmul.yaml` + 三个 case manifest 草案 |
+
+新增概念：
+
+- **op spec**（`ops/`）：独立于实现和测试的公共 op 接口契约，用 YAML 定义每个 op 的输入、输出、属性和计算语义
+- **case manifest**（`tests/**/case.json`）：op spec 的一次具体实例化，绑定具体 shape/dtype/golden 路径
+- **golden manifest**（`golden/**/manifest.json`）：golden 数据的二进制格式描述，与 op spec 和 case manifest 无依赖
+
+三层关系：
+
+```text
+op spec（契约）          ops/tensor/matmul.yaml
+  ↑ 实现                    ↑ 引用 + 实例化
+cutelib/              case manifest（case.json）
+                         ↑ 引用
+                      golden manifest（manifest.json）
+```
 
 验收：
 
 - `instruction.h`、`isa.json`、`cute_fpe.h` 已生成到 `cuteisa/`。
 - 第一批 case 都有明确的 `cutetest/` 来源路径。
 - 第一批 case 都明确 dtype、shape、bias mode 和输出 tensor。
+- `ops/tensor/matmul.yaml` 已定义 matmul op 的完整语义。
+- 三个 smoke case 的 case manifest 草案已完成。
 
 建议第一批 case：
 
