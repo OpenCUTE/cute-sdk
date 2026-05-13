@@ -203,12 +203,12 @@ HWConfig / ChipyardConfig / 版本 manifests / JSON Schema / CUTETrace catalog +
 ## 依赖关系
 
 ```text
-Phase 0.7: cuteisa（instruction.h + isa.json）──────────────┐
-                                                             │
-Phase 1: cuteqemu  ←── 消费 cuteisa/isa.json ──────────────┤
+Phase 0.7: cuteisa（instruction.h + isa.json）───────────────┐
+                                                            │
+Phase 1: cuteqemu  ←── 消费 cuteisa/isa.json ────────────────┤
 Phase 2: nvwa ──────────────────────────────────────────────┤
 Phase 3: memverify ─────────────────────────────────────────┤
-                                                             │
+                                                            │
 Phase 4: cutelib/runtime  ←── 消费 cuteisa/instruction.h + cuteqemu + nvwa + memverify
 Phase 5: cutelib/tensor   ←── 依赖 runtime
 Phase 6: cutelib/layer    ←── 依赖 tensor
