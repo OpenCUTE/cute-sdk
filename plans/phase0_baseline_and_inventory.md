@@ -2,7 +2,73 @@
 
 > 状态：**待执行**
 > 前置依赖：无
-> 验收标准：cuteisa artifacts 就位；迁移矩阵完成；第一批 smoke cases 的 op spec 和 case manifest 定义清楚。
+> 验收标准：cuteisa artifacts 就位；迁移矩阵完成；runtime lib 和 tensor lib 的目标和测试范围明确；第一批 smoke cases 的 op spec 和 case manifest 定义清楚。
+
+---
+
+## 两级 lib 的目标和测试策略
+
+### runtime lib 的目标
+
+runtime lib 是对 CUTE 指令的直接封装，它的核心能力是：
+
+**能正确发射任意数据格式的 tensor × tensor（64B 对齐）的矩阵乘任务，并算对。**
+
+具体来说：
+- 对 13 种 `ElementDataType`（I8 → FP8E5M2）都能正确 config + issue
+- 三种 bias_mode（ZeroLoad / RowRepeat / FullLoad）都能正确处理
+- blockscale dtype（MXFP8 / MXFP4 / NVFP4）能正确配置 Scale A/B
+- 指令序列与 `cuteMarcoinstHelper.h` 等价
+- 矩阵数据 64B 对齐
+
+runtime lib 的全量测试 case 是明确的：`dtype × bias_mode × shape` 的组合。cutetest 里已经覆盖了大部分组合。
+
+### tensor lib 的目标
+
+tensor lib 在 runtime lib 之上，提供**分块（tiled）矩阵乘 kernel**。它要解决的问题是：当矩阵尺寸超过 CUTE 加速器单次处理的 capacity 时，如何将大矩阵乘拆分为多个 tile 并正确组合结果。
+
+tensor lib 需要提供以下 tiled matmul 策略：
+
+| 策略 | 含义 | 典型场景 |
+|------|------|----------|
+| **2M×2K** | 沿 M 维切 2 块、K 维切 2 块，共 4 个子任务，部分结果沿 K 累加 | 大 M、大 K 的 GEMM |
+| **2N×2K** | 沿 N 维切 2 块、K 维切 2 块，共 4 个子任务，部分结果沿 K 累加 | 大 N、大 K 的 GEMM |
+| **2M×2N** | 沿 M 维切 2 块、N 维切 2 块，共 4 个子任务，无需累加 | 大 M、大 N 的 GEMM |
+| **GQA shared** | Q 矩阵在多个 group 间共享，K/V 按 group 分块；Q tile 发一次，复用于多组 K/V matmul | GQA attention 的 Q·K^T 计算 |
+
+```text
+2M×2K:  ┌─────┬─────┐      2N×2K:  ┌─────┬─────┐
+        │ A11 │ A12 │              │     │     │
+        ├─────┼─────┤              │ B11 │ B12 │
+        │ A21 │ A22 │              │     │     │
+        └─────┴─────┘              └─────┴─────┘
+        D11 = A11×B + A12×B        D11 = A×B11, D12 = A×B12
+        D21 = A21×B + A22×B        (K 维累加)
+
+2M×2N:  ┌─────┬─────┐      GQA:   Q ──┬── K1×Q^T → S1
+        │ D11 │ D12 │              ├── K2×Q^T → S2
+        ├─────┼─────┤              └── K3×Q^T → S3
+        │ D21 │ D22 │              (Q tile 共享，不发 3 次)
+        └─────┴─────┘
+        (各 tile 独立，无累加)
+```
+
+这些 tiled matmul 的实现素材在 `cutetest/gemm_test/` 中已经有雏形（不同 Tops 配置、multi_cute_config 等）。
+
+### 测试策略
+
+```text
+runtime lib 测试：
+  smoke → dtype 覆盖（I8 / Mxfp8e4m3 / 其他 dtype 各一个）
+  regression → dtype × bias_mode × shape 矩阵
+  （全量 case 边界清楚，可以直接从 cutetest 迁移）
+
+tensor lib 测试：
+  smoke → 同样 3 个 dtype，但使用 tiled matmul 策略执行
+  regression → 每种 tiling 策略 × dtype × shape
+  GQA shared → 需要额外构造 Q/K/V 分块场景
+  （case 规划需要更多设计，Phase 0 先明确目标，不展开具体 case）
+```
 
 ---
 
@@ -95,9 +161,13 @@ case_id | source_path | level | op | dtype | shape | bias_mode | has_golden_h | 
 
 ## 0.3 选定第一批 smoke cases
 
-**目标**：从迁移矩阵中挑选 3 个 case，覆盖 runtime、基础 matmul、blockscale dtype 三个层面。
+**目标**：为 runtime lib 和 tensor lib 各选 3 个 smoke case，覆盖基本数据格式验证。
 
-### Case 1: `runtime_hello`
+### runtime lib smoke cases
+
+runtime lib 的 smoke test 验证"能正确发射任意 dtype 的 matmul 任务并算对"。三个 case 覆盖三个 dtype 层面：
+
+#### Case R1: `runtime_hello`（I8 基础指令路径）
 
 | 字段 | 值 |
 |------|-----|
@@ -118,14 +188,14 @@ case_id | source_path | level | op | dtype | shape | bias_mode | has_golden_h | 
 
 **特别说明**：`cutehello.c` 实际调用了 `issue_cute_matmul_marco_inst()`，所以它不仅是 runtime smoke，也隐含了 matmul 正确性。但作为 runtime case，我们只关注"指令能发出去、能 wait 完成"，不要求第一版就做 memverify。
 
-### Case 2: `matmul_i8_128_128_128_zeroinit`
+#### Case R2: `runtime_matmul_i8_128_128_128_zeroinit`（I8 matmul correctness）
 
 | 字段 | 值 |
 |------|-----|
-| case_id | `matmul_i8_128_128_128_zeroinit` |
+| case_id | `runtime_matmul_i8_128_128_128_zeroinit` |
 | 来源 | `cutetest/base_test/cute_Matmul_mnk_128_128_128_zeroinit.c` |
-| 目的 | 基础 INT8 matmul correctness |
-| level | tensor |
+| 目的 | INT8 matmul 端到端 correctness |
+| level | runtime |
 | op | matmul |
 | dtype | `DataTypeI8I8I32` (value=0) |
 | shape | M=128, N=128, K=128 |
@@ -143,14 +213,14 @@ case_id | source_path | level | op | dtype | shape | bias_mode | has_golden_h | 
 - `.h` 文件中 golden 变量名为 `gloden_d`（原文拼写），迁移时需注意
 - `.h` 文件大小 294,317 B
 
-### Case 3: `matmul_mxfp8e4m3_64_64_64_zeroinit`
+#### Case R3: `runtime_matmul_mxfp8e4m3_64_64_64_zeroinit`（MXFP8 blockscale matmul）
 
 | 字段 | 值 |
 |------|-----|
-| case_id | `matmul_mxfp8e4m3_64_64_64_zeroinit` |
+| case_id | `runtime_matmul_mxfp8e4m3_64_64_64_zeroinit` |
 | 来源 | `cutetest/datatype_mm_test/mxfp8e4m3/cute_Matmul_mxfp8_mnk_64_64_64_zeroinit.c` |
-| 目的 | blockscale dtype (MXFP8) matmul smoke |
-| level | tensor |
+| 目的 | blockscale dtype (MXFP8) matmul，验证 Scale A/B 配置路径 |
+| level | runtime |
 | op | matmul |
 | dtype | `DataTypeMxfp8e4m3F32` (value=7) |
 | shape | M=64, N=64, K=64 |
@@ -169,11 +239,25 @@ case_id | source_path | level | op | dtype | shape | bias_mode | has_golden_h | 
 - 选择 64×64×64 而非更大 shape，是因为 golden `.h` 最小（93,059 B），且 `compare_result.py` 默认 `test_id=1` 对应 shape=128，需确认 64 对应 `test_id=0`
 - 输出 golden 变量名为 `gloden_c`（注意是 C 不是 D）
 
+### tensor lib smoke cases
+
+tensor lib 的 smoke test 验证"用相同的 3 个 dtype，但通过分块策略执行 matmul"。tensor lib 的 case 需要在 runtime lib 跑通后再规划，Phase 0 只定义目标和方向：
+
+| Case | 策略 | 目的 |
+|------|------|------|
+| T1 | `tiled_matmul` 2M×2K, I8 | M 和 K 各切 2 块，验证 K 维累加正确性 |
+| T2 | `tiled_matmul` 2N×2K, I8 | N 和 K 各切 2 块，验证 K 维累加正确性 |
+| T3 | `tiled_matmul` 2M×2N, I8 | M 和 N 各切 2 块，验证独立 tile 无累加 |
+| T4 | `tiled_matmul` GQA shared, MXFP8 | Q tile 共享，复用于多组 K/V matmul |
+
+tensor lib 的具体 case manifest 需要在 runtime lib 跑通、分块策略的 op spec 定义清楚后再展开。cutetest 中的 `gemm_test/` 提供了这些分块策略的实现素材。
+
 **执行步骤**：
 
-- [ ] 0.3.1 确认以上 3 个 case 的 `.c` 和 `.h` 文件均可读、无损坏
+- [ ] 0.3.1 确认 runtime lib 3 个 case 的 `.c` 和 `.h` 文件均可读、无损坏
 - [ ] 0.3.2 对每个 case，确认 golden 数组名、shape 常量、dtype 枚举值与 yaml 定义一致
-- [ ] 0.3.3 对 `matmul_mxfp8e4m3_64_64_64_zeroinit`，确认 scale 数据格式和位置
+- [ ] 0.3.3 对 Case R3，确认 scale 数据格式和位置
+- [ ] 0.3.4 盘点 `cutetest/gemm_test/` 中的分块策略素材，为 tensor lib case 做准备
 
 ---
 
@@ -496,10 +580,12 @@ golden manifest 只描述 golden 数据本身的二进制格式，与 op spec �
 - 不写任何 `cutelib/` 代码
 - 不写任何 `tests/` 代码
 - 不实现 `memverify/`
-- 不做 `.h` → `.bin` 的 golden 转换（只记录格式）
+- 不做 `.h` --> `.bin` 的 golden 转换（只记录格式）
 - 不涉及 `gemm_test`、`resnet50_test`、`transformer_test` 的详细展开
 - 不涉及 cuteqemu、nvwa
 - 不定义 conv2d / layer / model 级别的 op spec
+- 不展开 tensor lib 的具体 tiled matmul case（等 runtime lib 跑通后再规划）
+- layer / fusion / model 级别完全后置，correctness-first
 
 ---
 
