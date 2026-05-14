@@ -1,0 +1,179 @@
+op: matmul
+level: tensor
+version: 1
+
+description: 矩阵乘法 D = A × B + C
+
+inputs:
+  A:
+    type: Tensor
+    description: 左操作数矩阵
+    dtype: ElementDataType
+    shape: [M, K]
+  B:
+    type: Tensor
+    description: 右操作数矩阵
+    dtype: same_as_A
+    shape: [K, N]
+  C:
+    type: Tensor
+    description: |
+      偏置矩阵（bias）。
+      bias_mode 决定 C 的加载方式：
+      - ZeroLoad: C 不参与计算，等效于 D = A × B
+      - RowRepeat: C 的第一行广播到所有行（bias 向量）
+      - FullLoad: C 全部加载，D = A × B + C
+    dtype: same_as_D
+    shape: [M, N]
+    bias_mode: CMemoryLoaderTaskType
+
+outputs:
+  D:
+    type: Tensor
+    description: 输出矩阵
+    dtype: I32 | F32
+    shape: [M, N]
+
+attributes:
+  dtype:
+    type: ElementDataType
+    description: 矩阵元素数据类型，决定乘法和累加精度
+    values:
+      - name: DataTypeI8I8I32
+        value: 0
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+      - name: DataTypeF16F16F32
+        value: 1
+        a_bits: 16
+        b_bits: 16
+        c_bits: 32
+      - name: DataTypeBF16BF16F32
+        value: 2
+        a_bits: 16
+        b_bits: 16
+        c_bits: 32
+      - name: DataTypeTF32TF32F32
+        value: 3
+        a_bits: 32
+        b_bits: 32
+        c_bits: 32
+      - name: DataTypeI8U8I32
+        value: 4
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+      - name: DataTypeU8I8I32
+        value: 5
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+      - name: DataTypeU8U8I32
+        value: 6
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+      - name: DataTypeMxfp8e4m3F32
+        value: 7
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+        blockscale: true
+      - name: DataTypeMxfp8e5m2F32
+        value: 8
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+        blockscale: true
+      - name: DataTypenvfp4F32
+        value: 9
+        a_bits: 4
+        b_bits: 4
+        c_bits: 32
+        blockscale: true
+      - name: DataTypemxfp4F32
+        value: 10
+        a_bits: 4
+        b_bits: 4
+        c_bits: 32
+        blockscale: true
+      - name: DataTypefp8e4m3F32
+        value: 11
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+      - name: DataTypefp8e5m2F32
+        value: 12
+        a_bits: 8
+        b_bits: 8
+        c_bits: 32
+
+  bias_mode:
+    type: CMemoryLoaderTaskType
+    description: C 张量（bias）的加载模式
+    values:
+      - name: TaskTypeTensorZeroLoad
+        value: 1
+        description: 填充零（不加载，C 初始化为 0）
+      - name: TaskTypeTensorRepeatRowLoad
+        value: 2
+        description: 重复加载一行（bias 向量广播）
+      - name: TaskTypeTensorLoad
+        value: 3
+        description: 完整加载所有数据
+
+  transpose:
+    type: bool
+    default: false
+    description: 是否转置输出 D
+
+  blockscale:
+    type: BlockScaleConfig
+    required: false
+    description: |
+      blockscale dtype（Mxfp8e4m3 / Mxfp8e5m2 / Nvfp4 / Mxfp4）需要额外提供 scale 张量。
+      非 blockscale dtype 时此属性为 null。
+    fields:
+      scale_a:
+        type: Tensor
+        description: |
+          A 的 block scale 数据。
+          按 64×64 的 A 元素块为单位组织，以 K 维为主序存储。
+          每个 64×64 块对应的 scale 数据大小由 dtype 决定：
+
+          例（Nvfp4）：64×64 块 --> 64×4 = 256 个 8-bit scale 值，
+          block size 为 16 个元素，每行 64/16 = 4 个 scale，
+          每 16×4×8 = 512 bit = 64 byte 为一个 cacheline，
+          连续存放 4 个 cacheline = 256 byte。
+
+          例（Mxfp8e4m3）：64×64 块 --> 64×2 = 128 个 8-bit scale 值，
+          block size 为 32 个元素，每行 64/32 = 2 个 scale，
+          64 行 × 2 = 128 byte，连续存放 2 个 cacheline = 128 byte。
+
+          整体 scale_a 大小 = ceil(M/64) × ceil(K/64) × per_block_scale_bytes。
+          64 byte 对齐。
+      scale_b:
+        type: Tensor
+        description: |
+          B 的 block scale 数据，布局与 scale_a 对称。
+          以 K 维为主序，按 64×64 块组织。
+          64 byte 对齐。
+
+semantics: |
+  D[m][n] = sum_k( A[m][k] * B[k][n] ) + C[m][n]
+
+  当 bias_mode=ZeroLoad 时，C 全为零，等效于 D = A × B
+  当 bias_mode=RowRepeat 时，C[0][n] 广播到所有行
+  当 bias_mode=FullLoad 时，C 全部参与加法
+
+  当 blockscale 启用时（dtype 为 Mxfp8/Mxfp4/Nvfp4），
+  乘法按 block-wise quantized scale 计算。
+
+constraints:
+  - A.dtype == B.dtype
+  - A.shape[1] == B.shape[0]   # K 维度必须匹配
+  - C.shape == D.shape == [M, N]
+  - blockscale 仅在 dtype 为 Mxfp8e4m3 / Mxfp8e5m2 / Nvfp4 / Mxfp4 时启用
+  - 所有 tensor 数据需 64 byte 对齐
+  - scale 数据需 64 byte 对齐
