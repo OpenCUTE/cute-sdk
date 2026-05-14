@@ -103,6 +103,69 @@ cutelib 开发 ──────┤
                           └── xDMA 读回 → memverify 比对
 ```
 
+## 构建系统
+
+cute-sdk 使用 CMake 构建，采用层叠 target 设计。每一层 SDK 库对应一个 CMake target，上层依赖下层。
+
+### 层叠结构
+
+```text
+cuteisa (INTERFACE)          ← L0: ISA 原子指令（instruction.h）
+    ↑
+cutelib_runtime (INTERFACE)  ← L1: runtime 组合封装（cute_runtime.h）
+    ↑
+cutelib_tensor (INTERFACE)   ← L2: tensor API（未来）
+    ↑
+cutelib_layer (INTERFACE)    ← L3: layer API（未来）
+```
+
+### CMake target 关系
+
+```cmake
+# L0: cuteisa — 只提供 include 路径
+add_library(cuteisa INTERFACE)
+target_include_directories(cuteisa INTERFACE cuteisa/cute_isa_v1)
+
+# L1: cutelib_runtime — 依赖 cuteisa，include 自动传递
+add_library(cutelib_runtime INTERFACE)
+target_include_directories(cutelib_runtime INTERFACE cutelib/runtime)
+target_link_libraries(cutelib_runtime INTERFACE cuteisa)
+
+# Tests — 链接对应层，自动获得所有下层的 include
+add_executable(test_xxx tests/runtime/.../test.c)
+target_link_libraries(test_xxx PRIVATE cutelib_runtime)
+```
+
+### 扩展规则
+
+**新增层**（3 行 CMake）：
+
+```cmake
+add_library(cutelib_tensor INTERFACE)
+target_include_directories(cutelib_tensor INTERFACE cutelib/tensor)
+target_link_libraries(cutelib_tensor INTERFACE cutelib_runtime)
+```
+
+**从 header-only 升级到 .c 实现**（test 侧零改动）：
+
+```cmake
+# 之前（header-only）
+# add_library(cutelib_tensor INTERFACE)
+
+# 之后（有 .c 实现）
+add_library(cutelib_tensor STATIC cutelib/tensor/cute_tensor.c)
+target_include_directories(cutelib_tensor PUBLIC cutelib/tensor)
+target_link_libraries(cutelib_tensor PUBLIC cutelib_runtime)
+```
+
+### 构建命令
+
+```bash
+cd cute-sdk && mkdir -p build && cd build
+cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/riscv-toolchain.cmake
+make -j$(nproc)
+```
+
 ## 目录结构
 
 ```text
@@ -117,18 +180,19 @@ cute-sdk/
 ├── nvwa/               # Golden 生成与多平台对齐
 ├── memverify/          # 内存比对引擎
 ├── cutelib/            # 分层库函数（实现 ops/ 中定义的 op spec）
-│   ├── runtime/        #   runtime lib
+│   ├── runtime/        #   runtime lib（cute_runtime.h）
 │   ├── tensor/         #   tensor lib
 │   ├── layer/          #   layer lib
 │   ├── fusion/         #   fusion lib
 │   └── model/          #   model lib
 ├── tests/              # 测试用例（case manifest 驱动）
-│   ├── runtime/
-│   ├── tensor/
-│   ├── layer/
-│   └── model/
+│   └── runtime/
 ├── golden/             # Golden 参考数据
 │   └── manual/         #   人工 golden（从 cutetest .h 文件导入）
+├── CMakeLists.txt      # 根 CMake（层叠 target + test 函数）
+├── cmake/
+│   └── riscv-toolchain.cmake  # RISC-V 交叉编译 toolchain
+├── run_test.py         # test runner: build → simulate → verify
 ├── readme.md
 └── timeline.md
 ```
