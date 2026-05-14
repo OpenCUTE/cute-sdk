@@ -15,8 +15,17 @@
       "scale_b": true
     }
   },
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
   "golden": "golden/manual/tensor/matmul_mxfp8e4m3_64_64_64_zeroinit/manifest.json",
   "verify": {
-    "mode": "bit_exact"
+    "mode": "bit_exact",
+    "tensor": "D"
   }
 }

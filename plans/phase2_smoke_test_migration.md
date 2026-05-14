@@ -313,9 +313,9 @@ add_runtime_test(runtime_matmul_new_case)
 #### 构建命令
 
 ```bash
-cd cute-sdk && mkdir -p build && cd build
-cmake .. -DCMAKE_TOOLCHAIN_FILE=../cmake/riscv-toolchain.cmake
-make -j$(nproc)
+mkdir -p build && cd build
+cmake -S . -DCMAKE_TOOLCHAIN_FILE=./cmake/riscv-toolchain.cmake -B build
+cmake --build build -j$(nproc)
 ```
 
 ### 2.5 实现 test runner
