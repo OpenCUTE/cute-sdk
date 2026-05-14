@@ -1,0 +1,75 @@
+{
+  "id": "mxfp8_mnk_64_64_64_zeroinit",
+  "op": "matmul",
+  "tensors": {
+    "A": {
+      "path": "input_a.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 64
+    },
+    "B": {
+      "path": "input_b.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 64
+    },
+    "D": {
+      "path": "golden.bin",
+      "element_bits": 32,
+      "dtype": "I32",
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 256
+    },
+    "scale_a": {
+      "path": "scale_a.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 1
+    },
+    "scale_b": {
+      "path": "scale_b.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 1
+    }
+  },
+  "blockscale": {
+    "scale_a": true,
+    "scale_b": true
+  },
+  "defines": {
+    "M": 64,
+    "N": 64,
+    "K": 64,
+    "bias_type": 1,
+    "transpose": 0,
+    "element_type": 7
+  },
+  "generator": {
+    "tool": "manual_import",
+    "created": "2026-05-14"
+  }
+}

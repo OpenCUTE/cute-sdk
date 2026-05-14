@@ -1,0 +1,52 @@
+{
+  "id": "mnk_128_128_128_zeroinit",
+  "op": "matmul",
+  "tensors": {
+    "A": {
+      "path": "input_a.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 128
+    },
+    "B": {
+      "path": "input_b.bin",
+      "element_bits": 8,
+      "dtype": "I8",
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 128
+    },
+    "D": {
+      "path": "golden.bin",
+      "element_bits": 32,
+      "dtype": "I32",
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 512
+    }
+  },
+  "blockscale": null,
+  "defines": {
+    "M": 128,
+    "N": 128,
+    "K": 128,
+    "bias_type": 1,
+    "transpose": 0,
+    "element_type": null
+  },
+  "generator": {
+    "tool": "manual_import",
+    "created": "2026-05-14"
+  }
+}
