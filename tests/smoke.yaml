@@ -1,0 +1,10 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 1
+cases:
+  - runtime_matmul_i8_128_128_128_zeroinit
+  - runtime_matmul_i8_128_128_128_zeroinit_transpose
+  - runtime_matmul_mxfp8e4m3_64_64_64_zeroinit
+verify:
+  mode: bit_exact
+  tensor: D
