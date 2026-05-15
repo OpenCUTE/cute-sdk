@@ -1,7 +1,7 @@
-# Phase A：L1 cutelib/runtime 扩展
+# Phase A：L0 cutelib/runtime 扩展
 
 > 状态：**待执行**
-> 前置依赖：无（L0 cuteisa 已完成）
+> 前置依赖：无（ISA cuteisa 已完成）
 > 产出：`cutelib/runtime/cute_runtime.h` 补齐全部 FIFO 管理原语
 > 预计改动量：1 个文件修改，~40 行新增
 
@@ -10,7 +10,7 @@
 ## 1. 目标
 
 当前 `cute_runtime.h` 只有 `cute_matmul()` 和 `cute_blockscale_matmul()` 两个组合封装。
-Phase B（tensor 层）的 tiled pipeline 调度需要以下能力：
+Phase B（L1 tensor 层）的 tiled pipeline 调度需要以下能力：
 
 1. **按 task_id 等待 + 出队** — `CUTE_TASK_END(task_id)` 等价
 2. **非阻塞查询** — 检查完成状态、FIFO 满等

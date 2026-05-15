@@ -1,8 +1,8 @@
-# Phase B: L2 cutelib/tensor 实现计划
+# Phase B: L1 cutelib/tensor 实现计划
 
 ## Context
 
-cute-sdk 需要在 L1 runtime 之上加一层 tensor 抽象，提供 `cute_tensor_t` 描述符 + 单 tile matmul + tiled matmul with pipeline。这是 llama 模型迁移计划 Phase B，为后续 fusion/model 层打基础。
+cute-sdk 需要在 L0 runtime 之上加一层 tensor 抽象，提供 `cute_tensor_t` 描述符 + 单 tile matmul + tiled matmul with pipeline。这是 llama 模型迁移计划 Phase B，为后续 primitive/fusion/layer 层打基础。
 
 迁移计划中有两个 bug 需要修复：
 1. cute_matmul_op 的 c/d 参数混淆（c 实际是 bias，d 是 output）
@@ -173,7 +173,7 @@ function(add_tensor_test case_dir) ... endfunction()
 
 ## 关键文件
 
-- `cutelib/runtime/cute_runtime.h` — L1 API（cute_matmul, cute_wait_task）
+- `cutelib/runtime/cute_runtime.h` — L0 API（cute_matmul, cute_wait_task）
 - `tests/runtime/runtime_matmul_i8_tiled_128x128_fifo/test.c` — 已验证的 tiled pipeline 模式
 - `cuteisa/cute_isa_v1/cute_fpe.h` — dtype 常量
 - `CMakeLists.txt` — 构建系统

@@ -1,21 +1,23 @@
-# Phase C / Phase 3: L3 cutelib/fusion 实现计划
+# Phase C1 / Phase 3b: fusion/pipeline 组合实现计划
 
 ## Context
 
-cute-sdk 需要把 `cutetest/transformer_test/llama/llama3_1B.c` 中 CPU 侧后处理逻辑迁入 L3 `cutelib/fusion`，供 Phase B 的 `cute_tiled_matmul` 回调和 Phase D 的 `cute_llama_block` 编排复用。
+cute-sdk 需要把 Phase C0 中已经验证的 L2 单算子 primitive 组合成 L3 `cutelib/fusion` post-op，供 L1 tensor 的 `cute_tiled_matmul` pipeline 回调和 L4 layer 的 `cute_llama_block` 编排复用。
 
-Phase C 的核心目标不是重写数学逻辑，而是把原始函数做最小侵入式封装：
+本计划建议在 [`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) 之后执行：先实现并验证单算子 primitive，再由 fusion 层把 primitive 组合成 `cute_tiled_matmul` 的 fused post-op，并接入 pipeline。
 
-1. 保留原实现的数值路径，确保 bit-exact。
+Phase C1 的核心目标不是重写数学逻辑，而是做组合和适配：
+
+1. 复用 Phase C0 已验证的 primitive，确保 bit-exact。
 2. 去掉 `printf` / workload log / debug 分支。
 3. 把不统一的 `void *ctx` 语义显式化，避免 model 层猜参数。
-4. 为每个 fusion/quant/norm 函数建立可单测的输入输出边界。
+4. 让每个 fusion 函数只负责 glue：读取 `cute_post_call_t`、构造 primitive 参数、写回输出。
 
 ---
 
 ## 1. 迁移范围
 
-### 1.1 从 llama3_1B.c 迁出的函数
+### 1.1 Fusion post-op 范围
 
 | 原函数 | 新 API | 用途 | 调用方式 |
 |---|---|---|---|
@@ -25,13 +27,12 @@ Phase C 的核心目标不是重写数学逻辑，而是把原始函数做最小
 | `fuse_ops_DEQUANT_RESADD` | `cute_fuse_dequant_resadd` | proj_o/ffn_down: I32 -> F32 + residual | tiled matmul post_op |
 | `fuse_ops_DEQUANT_SILU` | `cute_fuse_dequant_silu` | ffn_gate: I32 -> F32 -> SiLU | tiled matmul post_op |
 | `fuse_ops_DEQUANT_HADAMARD` | `cute_fuse_dequant_hadamard` | ffn_up: I32 -> F32 -> hadamard + absmax | tiled matmul post_op |
-| `smoothquant` | `cute_smoothquant` | F32 -> INT8 per-token quant | model 层直接调用 |
-| `RMSnorm` | `cute_rmsnorm` | RMS norm | model 层直接调用/测试辅助 |
-| `RMSnorm_With_getabsmax_scale` | `cute_rmsnorm_with_scale` | RMS norm + absmax scale | model 层直接调用 |
-| `vec_exp` / `vec_sin` / `vec_cos` 等 | `cute_vec_*` internal helpers | RISC-V V 向量数学 | fusion 内部调用 |
 
-### 1.2 Phase C 不做的事情
+`smoothquant`、`RMSnorm`、`RMSnorm_With_getabsmax_scale`、`vec_exp`、`vec_sin`、`vec_cos` 等不属于 fusion 组合层，放在 Phase C0 单算子 primitive 中实现。
 
+### 1.2 Phase C1 不做的事情
+
+- 不重新实现 Phase C0 已完成的 primitive 数学逻辑。
 - 不改变 Phase B 的 tile 调度策略。
 - 不在 fusion 层管理模型级 buffer 生命周期。
 - 不把 attention head 循环搬进 fusion 层。
@@ -45,8 +46,6 @@ Phase C 的核心目标不是重写数学逻辑，而是把原始函数做最小
 ```
 cutelib/fusion/include/
     cute_fusion.h       # fusion 回调类型、ctx 结构、6 个 matmul post_op
-    cute_quant.h        # smoothquant / rmsnorm / rmsnorm_with_scale
-    cute_vec_math.h     # RISC-V V 向量数学 helper，仅 fusion/quant 内部使用
 
 tests/fusion/
     test_fuse_dequant_rope_bf16cvt/
@@ -55,26 +54,23 @@ tests/fusion/
     test_fuse_dequant_silu/
     test_fuse_dequant_hadamard/
     test_fuse_dequant_resadd/
-    test_smoothquant/
-    test_rmsnorm/
-    test_rmsnorm_with_scale/
 ```
 
-如果项目继续保持 header-only 风格，`cutelib/fusion/include/*.h` 内全部使用 `static inline`。如果编译时间或重复符号成为问题，再把实现拆到 `cutelib/fusion/src/*.c`，但 Phase C 第一版不做该拆分。
+如果项目继续保持 header-only 风格，`cutelib/fusion/include/*.h` 内全部使用 `static inline`。如果编译时间或重复符号成为问题，再把实现拆到 `cutelib/fusion/src/*.c`，但 Phase C1 第一版不做该拆分。
 
 ---
 
 ## 3. API 定稿
 
-### 3.1 与 Phase B 对齐的 post_op 签名
+### 3.1 与 L1 tensor 对齐的 post_op 签名
 
-Phase B 计划已经把回调收敛到 struct-based 形式：
+Phase B / L1 tensor 计划已经把回调收敛到 struct-based 形式：
 
 ```c
 typedef void (*cute_post_op_fn)(const cute_post_call_t *call);
 ```
 
-Phase C 直接使用该签名，不再继续使用旧版：
+Phase C1 直接使用该签名，不再继续使用旧版：
 
 ```c
 typedef void (*cute_fusion_fn)(
@@ -102,6 +98,9 @@ typedef void (*cute_fusion_fn)(
 #include <stdint.h>
 #include <stddef.h>
 #include "cute_ops.h"
+#include "cute_convert.h"
+#include "cute_elementwise.h"
+#include "cute_sequence.h"
 
 typedef struct {
     int pos;
@@ -137,50 +136,6 @@ void cute_fuse_dequant_resadd(const cute_post_call_t *call);
 #endif /* CUTE_FUSION_H */
 ```
 
-### 3.3 cute_quant.h
-
-```c
-#ifndef CUTE_QUANT_H
-#define CUTE_QUANT_H
-
-#include <stdbool.h>
-#include <stdint.h>
-
-void cute_smoothquant(float *input, int dim_i, int dim_j,
-                      int8_t *output, float *output_scale,
-                      bool need_stage1);
-
-void cute_rmsnorm(float *input, float *output,
-                  float *per_channel_scale, float rms_epsilon,
-                  int batch, int seq_len, int hidden_dim);
-
-void cute_rmsnorm_with_scale(float *input, float *output,
-                             float *per_channel_scale,
-                             float *per_token_scale,
-                             float rms_epsilon,
-                             int batch, int seq_len, int hidden_dim);
-
-#endif /* CUTE_QUANT_H */
-```
-
-### 3.4 cute_vec_math.h
-
-```c
-#ifndef CUTE_VEC_MATH_H
-#define CUTE_VEC_MATH_H
-
-#include <riscv_vector.h>
-
-static inline float cute_fast_sqrt(float x);
-static inline vfloat32m4_t cute_vec_exp(vfloat32m4_t x, size_t vl);
-static inline vfloat32m4_t cute_vec_sin(vfloat32m4_t x, size_t vl);
-static inline vfloat32m4_t cute_vec_cos(vfloat32m4_t x, size_t vl);
-
-#endif /* CUTE_VEC_MATH_H */
-```
-
-所有从 `llama3_1B.c` 复制来的向量函数只做命名空间改名，不调整系数、指令序列和循环结构。
-
 ---
 
 ## 4. 数据/布局约定
@@ -211,8 +166,6 @@ static inline vfloat32m4_t cute_vec_cos(vfloat32m4_t x, size_t vl);
 ### 4.3 与原实现保持一致的行为
 
 - BF16 输出继续使用 `_Float16`/BF16 原路径中相同的转换方式。
-- `smoothquant(..., need_stage1=true)` 保留两阶段 absmax/quant 行为。
-- `RMSnorm_With_getabsmax_scale` 的 absmax 语义保持为 per-token scale。
 - `FUSE_MASKED_SOFTMAX_KVSCALE_BF16CVRT` 的 causal mask 和 `INV_SQRT_KEY_DIMENSION` scale 顺序保持不变。
 - `fuse_ops_DEQUANT_BF16CVRT_With_T` 的 layout 写回保持与原实现一致，避免 proj_v/attention 后续地址计算变化。
 
@@ -220,56 +173,15 @@ static inline vfloat32m4_t cute_vec_cos(vfloat32m4_t x, size_t vl);
 
 ## 5. 执行步骤
 
-### Step 1: 准备头文件骨架
+### Step 1: 准备 fusion 头文件骨架
 
 创建：
 
-- `cutelib/fusion/include/cute_vec_math.h`
 - `cutelib/fusion/include/cute_fusion.h`
-- `cutelib/fusion/include/cute_quant.h`
 
-先只放 include guard、依赖 include、ctx struct 和函数声明。确保任意测试 include 这些头文件可以编译。
+先只放 include guard、依赖 include、ctx struct 和函数声明。确保任意测试 include 这个头文件可以编译。
 
-### Step 2: 搬迁向量数学 helper
-
-从 `llama3_1B.c` 迁出：
-
-- `fast_sqrt`
-- `vec_sin_small`
-- `vec_sin`
-- `vec_cos`
-- `vec_exp`
-
-改名为 `cute_*` 前缀。不要改常量、泰勒系数、RVV intrinsic 和循环条件。
-
-验证点：
-
-- 单独 include `cute_vec_math.h` 编译通过。
-- 无 `printf`、无模型全局变量依赖。
-
-### Step 3: 搬迁 quant/norm
-
-从 `llama3_1B.c` 迁出：
-
-- `smoothquant` -> `cute_smoothquant`
-- `RMSnorm` -> `cute_rmsnorm`
-- `RMSnorm_With_getabsmax_scale` -> `cute_rmsnorm_with_scale`
-
-只做以下整理：
-
-- 参数名修正：`per_channle_scale` -> `per_channel_scale`。
-- `bool` 来自 `<stdbool.h>`。
-- 内部调用 `cute_fast_sqrt`。
-- 移除 workload/debug 输出。
-
-测试顺序：
-
-1. `test_smoothquant` 覆盖 `need_stage1=false`。
-2. `test_smoothquant` 再覆盖 `need_stage1=true`。
-3. `test_rmsnorm` 覆盖 `cute_rmsnorm`。
-4. `test_rmsnorm_with_scale` 覆盖 norm 输出和 per-token scale。
-
-### Step 4: 搬迁简单 dequant fusion
+### Step 2: 组合简单 dequant fusion
 
 优先迁移无复杂 ctx 的函数：
 
@@ -279,7 +191,7 @@ static inline vfloat32m4_t cute_vec_cos(vfloat32m4_t x, size_t vl);
 
 这些函数用于验证 `cute_post_call_t` 到旧参数模型的映射是否正确。
 
-每个函数内部第一步统一展开局部变量：
+每个函数内部第一步统一展开 `cute_post_call_t`，然后调用 Phase C0 primitive：
 
 ```c
 int32_t *input = (int32_t *)call->tile.src;
@@ -298,13 +210,13 @@ uint64_t output_stride = call->tile.dst_stride;
 - `row0/col0` 非 0 的 tile 写回地址正确。
 - `a_scale` 使用当前 tile 行对应 scale，而不是全局 scale 起点。
 
-### Step 5: 搬迁 RoPE fusion
+### Step 3: 组合 RoPE fusion
 
 迁移 `cute_fuse_dequant_rope_bf16cvt`，显式使用 `cute_rope_ctx_t`。
 
 重点检查：
 
-- 原 `pos` 是 `void *` 传入，Phase C 改为 `ctx->pos`。
+- 原 `pos` 是 `void *` 传入，Phase C1 改为 `ctx->pos`。
 - `rope_theta` 不再读取 `llama3_1B.c` 全局数组，必须由 ctx 传入。
 - `key_dim` 默认 64，但不要硬编码在函数内部。
 - q/k 的 head 内 layout 写回与原实现一致。
@@ -315,7 +227,7 @@ uint64_t output_stride = call->tile.dst_stride;
 - 准备 `pos=0` 和 `pos>0` 两组 golden。
 - q/k 共用同一测试函数，只换输出 buffer。
 
-### Step 6: 搬迁 Hadamard fusion
+### Step 4: 组合 Hadamard fusion
 
 迁移 `cute_fuse_dequant_hadamard`，显式使用 `cute_hadamard_ctx_t`。
 
@@ -333,11 +245,11 @@ output_absmax[row] = max(output_absmax[row], tile_absmax);
 
 因此测试必须覆盖至少两个 N tile 的 FFN case，避免只测 64 列时漏掉该问题。
 
-### Step 7: 搬迁 masked softmax fusion
+### Step 5: 组合 masked softmax fusion
 
 迁移 `cute_fuse_masked_softmax_kvscale_bf16cvt`，显式使用 `cute_softmax_ctx_t`。
 
-这是 Phase C 风险最高的函数，按三步做：
+这是 Phase C1 风险最高的函数，按三步做：
 
 1. 先搬原函数，保持 `dim_j != 64` 分支语义。
 2. 用单 head、单 tile 的 `SEQ_LEN=64` golden 验证 softmax。
@@ -350,9 +262,9 @@ output_absmax[row] = max(output_absmax[row], tile_absmax);
 - `kv_scale` 使用 ctx 字段，默认传 `INV_SQRT_KEY_DIMENSION`。
 - 输出 stride 按 `scores_buf_q16[N_HEAD_Q][SEQ_LEN][SEQ_LEN]` 的实际布局传入。
 
-Phase C 第一版可以要求 softmax post_op 只支持 scores 的单 head 调用，不在 fusion 内处理多 head 循环。
+Phase C1 第一版可以要求 softmax post_op 只支持 scores 的单 head 调用，不在 fusion 内处理多 head 循环。
 
-### Step 8: CMake 集成
+### Step 6: CMake 集成
 
 在顶层 `CMakeLists.txt` 添加：
 
@@ -361,7 +273,7 @@ add_library(cutelib_fusion INTERFACE)
 target_include_directories(cutelib_fusion INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/fusion/include
 )
-target_link_libraries(cutelib_fusion INTERFACE cutelib_tensor)
+target_link_libraries(cutelib_fusion INTERFACE cutelib_primitive)
 ```
 
 添加 fusion test helper：
@@ -372,12 +284,10 @@ function(add_fusion_test case_dir)
 endfunction()
 ```
 
-### Step 9: 更新 smoke.yaml
+### Step 7: 更新 smoke.yaml
 
 把以下测试加入 `tests/smoke.yaml`：
 
-- `fusion/test_smoothquant`
-- `fusion/test_rmsnorm`
 - `fusion/test_fuse_dequant_silu`
 - `fusion/test_fuse_dequant_resadd`
 - `fusion/test_fuse_dequant_bf16cvt`
@@ -401,9 +311,6 @@ endfunction()
 
 | 测试 | 输入 shape | 验证内容 |
 |---|---:|---|
-| `test_smoothquant` | 128 x 2048 | INT8 输出 + per-token scale bit-exact |
-| `test_rmsnorm` | 128 x 2048 | norm 输出 bit-exact |
-| `test_rmsnorm_with_scale` | 128 x 2048 | norm 输出 + absmax scale bit-exact |
 | `test_fuse_dequant_silu` | 64 x 64 | dequant + SiLU bit-exact |
 | `test_fuse_dequant_resadd` | 64 x 64 | dequant + residual add bit-exact |
 | `test_fuse_dequant_bf16cvt` | 64 x 64 | dequant + BF16 convert + layout bit-exact |
@@ -431,29 +338,26 @@ python3 tools/runner/cute-test.py --suite cute-sdk/tests/smoke.yaml --skip-build
 
 | 步骤 | 内容 | 依赖 | 预计耗时 |
 |------|------|------|---------|
-| 1 | 创建 fusion 头文件骨架 | Phase B API 定稿 | 15 min |
-| 2 | 迁移 `cute_vec_math.h` | 无 | 30 min |
-| 3 | 迁移 `cute_quant.h` | vec math | 45 min |
-| 4 | 添加 smoothquant/rmsnorm 测试 | quant/norm | 60 min |
-| 5 | 迁移 SiLU/ResAdd/BF16 简单 fusion | Phase B `cute_post_call_t` | 60 min |
-| 6 | 迁移 RoPE fusion | vec math + ctx | 60 min |
-| 7 | 迁移 Hadamard fusion | SiLU 输出约定 | 45 min |
-| 8 | 迁移 Masked Softmax fusion | vec exp + mask ctx | 90 min |
-| 9 | CMake + smoke.yaml 集成 | 全部测试目录 | 30 min |
-| 10 | 跑 smoke / 对照 golden | build/runner 可用 | 60 min |
+| 1 | 创建 fusion 头文件骨架 | L1 tensor API + Phase C0 primitive | 15 min |
+| 2 | 组合 SiLU/ResAdd/BF16 简单 fusion | Phase C0 convert/elementwise | 45 min |
+| 3 | 组合 RoPE fusion | Phase C0 convert/rope | 45 min |
+| 4 | 组合 Hadamard fusion | Phase C0 convert/hadamard | 45 min |
+| 5 | 组合 Masked Softmax fusion | Phase C0 softmax | 60 min |
+| 6 | CMake + smoke.yaml 集成 | 全部测试目录 | 30 min |
+| 7 | 跑 smoke / 对照 golden | build/runner 可用 | 60 min |
 
 ---
 
 ## 8. Done Criteria
 
-Phase C 完成时必须满足：
+Phase C1 完成时必须满足：
 
 1. `cutelib_fusion` 可被 `cutelib_model` 链接。
 2. 6 个 matmul post_op 全部使用 `cute_post_call_t`，无旧式散参数 wrapper 暴露给上层。
-3. `cute_smoothquant`、`cute_rmsnorm`、`cute_rmsnorm_with_scale` 可被 model 层直接调用。
+3. fusion 函数只做 primitive 组合和 post-op 适配，不重复实现数学核心。
 4. 所有函数不依赖 `llama3_1B.c` 的全局变量。
 5. 所有测试有固定 golden，并进入 smoke suite。
-6. 与原 `llama3_1B.c` 对应函数 bit-exact。
+6. 与原 `llama3_1B.c` 对应 fused 函数 bit-exact。
 
 ---
 
@@ -461,7 +365,7 @@ Phase C 完成时必须满足：
 
 | 风险 | 处理 |
 |------|------|
-| Phase B 的 `cute_post_call_t` 还未实现或字段变化 | Phase C 先以 Phase B 细化计划中的 struct 为准，字段变化时只调整 `cute_fusion.h` 映射层 |
+| L1 tensor 的 `cute_post_call_t` 还未实现或字段变化 | Phase C1 先以 Phase B 细化计划中的 struct 为准，字段变化时只调整 `cute_fusion.h` 映射层 |
 | BF16 转换类型在编译器上表现不一致 | 保留原实现使用的类型和 intrinsic，不替换成手写 bit cast |
 | Hadamard absmax 在多 N tile 下被覆盖 | `output_absmax[row] = max(old, tile_absmax)`，测试覆盖 128 列以上 |
 | Softmax 分支 tiling 与普通 64x64 tiling 不同 | 第一版限定为 scores 单 head post_op，model 层按 head 调用 |
@@ -470,10 +374,10 @@ Phase C 完成时必须满足：
 
 ---
 
-## 10. 不在 Phase C 范围内
+## 10. 不在 Phase C1 范围内
 
 - 不实现 `cute_llama_block`。
 - 不做跨 layer buffer allocator。
 - 不优化 softmax 算法复杂度。
 - 不改变 `SEQ_LEN=128`、`EMBEDING_DIMENSION=2048`、`FFN_DIMENSION=8192` 等 llama3_1B 固定 shape。
-- 不合并 RMSnorm + smoothquant，保持两个独立 API，方便 Phase D 逐步对齐。
+- 不实现 smoothquant/RMSNorm/vec math primitive，它们属于 Phase C0。

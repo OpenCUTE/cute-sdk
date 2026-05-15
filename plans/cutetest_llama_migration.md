@@ -8,15 +8,19 @@
 ## 1. 目标架构
 
 ```text
-L0 cuteisa                          ← ISA 原子指令（已完成）
+ISA cuteisa                         ← ISA 原子指令（已完成）
     ↑
-L1 cutelib/runtime                  ← CUTE 硬件交互原语（Phase 2 已部分完成，需扩展）
+L0 cutelib/runtime                  ← CUTE 硬件交互原语（Phase 2 已部分完成，需扩展）
     ↑
-L2 cutelib/tensor                   ← Tensor 描述 + Tiled Matmul + Pipeline 调度
+L1 cutelib/tensor                   ← Tensor 描述 + Tiled Matmul + Pipeline 调度
     ↑
-L3 cutelib/fusion                   ← CPU 端后处理（dequant / RoPE / softmax / SiLU / quant / rmsnorm）
+L2 cutelib/primitive                ← 单算子 primitive（dequant / vec / RoPE / softmax / SiLU / quant / rmsnorm）
     ↑
-L4 cutelib/model                    ← Transformer Block 编排（llama_block）
+L3 cutelib/fusion                   ← primitive 组合 + tiled matmul post-op/pipeline 适配
+    ↑
+L4 cutelib/layer                    ← 单层 Transformer Block 编排（llama_block）
+    ↑
+L5 cutelib/model                    ← 多层/完整模型编排（预留）
 ```
 
 验收标准：`cute_llama_block()` 的输出与 `llama3_1B.c` 的 `llama_block()` bit-exact 一致。
@@ -29,11 +33,11 @@ L4 cutelib/model                    ← Transformer Block 编排（llama_block�
 
 | 层 | 状态 | 说明 |
 |----|------|------|
-| L0 cuteisa | **完成** | `instruction.h` + `cute_fpe.h` 全部 ISA wrapper |
-| L1 cutelib/runtime | **部分完成** | `cute_matmul()` + `cute_blockscale_matmul()` 可用 |
-| L2-L4 | **未开始** | — |
+| ISA cuteisa | **完成** | `instruction.h` + `cute_fpe.h` 全部 ISA wrapper |
+| L0 cutelib/runtime | **部分完成** | `cute_matmul()` + `cute_blockscale_matmul()` 可用 |
+| L1-L5 | **未开始** | — |
 
-### L1 缺口分析
+### L0 runtime 缺口分析
 
 `llama3_1B.c` 的 `CUTE_TASK_END(task_id)` 使用了以下原语，当前 `cute_runtime.h` 未封装：
 
@@ -140,7 +144,7 @@ llama_block:
 
 ## 4. 分层执行计划
 
-### Phase A：L1 runtime 扩展（前置，无测试依赖）
+### Phase A：L0 runtime 扩展（前置，无测试依赖）
 
 > 目标：补齐 pipeline 调度所需的全部 runtime 原语。
 
@@ -204,7 +208,7 @@ static inline uint64_t cute_send(void) {
 
 当前 `cute_matmul()` 已经内部调用了 `CUTE_SEND_MACRO_INST()` 并返回 task_id，但有些场景需要先 config 再 send。
 
-### Phase B：L2 cutelib/tensor
+### Phase B：L1 cutelib/tensor
 
 > 目标：提供 `cute_tensor_t` 描述符 + 单 tile matmul + tiled matmul with pipeline。
 
@@ -443,7 +447,7 @@ static inline void cute_tiled_matmul(
 #### B.3 CMake 集成
 
 ```cmake
-# L2: cutelib/tensor — tensor API（header-only）
+# L1: cutelib/tensor — tensor API（header-only）
 add_library(cutelib_tensor INTERFACE)
 target_include_directories(cutelib_tensor INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/tensor/include
@@ -464,41 +468,53 @@ target_link_libraries(cutelib_tensor INTERFACE cutelib_runtime)
 
 tiled 测试需要 golden 数据（256×256 的 I8 matmul），可从 cutetest 导入或用 `get_mattest_value.py` 生成。
 
-### Phase C：L3 cutelib/fusion
+### Phase C：L2 primitive + L3 fusion
 
-> 目标：将 llama3_1B.c 中 7 个 fusion 函数 + 2 个独立操作迁入 cutelib/fusion/。
-> 细化计划：[`phaseC_fusion.md`](phaseC_fusion.md)
+> 目标：先将 llama3_1B.c 中的单算子拆成可独立验证的 primitive，再组合成 6 个 fusion post-op。
+> 推荐实施顺序：先做单算子 primitive，再实现 fusion/pipeline 组合。
+> 细化计划：[`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) → [`phaseC1_fusion_primitive.md`](phaseC1_fusion_primitive.md)
 
 #### C.1 目录结构
 
 ```text
+cutelib/primitive/
+└── include/
+    ├── cute_vec_math.h     # RVV vec_exp / vec_sin / vec_cos / sqrt
+    ├── cute_convert.h      # dequant / BF16 convert
+    ├── cute_elementwise.h  # SiLU / Hadamard / ResAdd
+    ├── cute_sequence.h     # RoPE / masked softmax
+    └── cute_quant.h        # smoothquant + rmsnorm
+
 cutelib/fusion/
 └── include/
-    ├── cute_fusion.h       # Fusion 回调统一声明
-    ├── cute_quant.h        # smoothquant + rmsnorm
-    └── cute_vec_math.h     # 底层向量数学：vec_exp, vec_sin, vec_cos（internal）
+    └── cute_fusion.h       # Fusion 回调统一声明，组合 ops primitive
 ```
 
-#### C.2 fusion 回调函数
+#### C.2 单算子 primitive
 
-7 个函数全部从 llama3_1B.c 搬入，去除 printf 和 debug 代码，统一为 `cute_fusion_fn` 签名：
+先实现不包含 fusion/pipeline 的单算子：
 
-```c
-// cute_fusion.h
+| Primitive | 来源/用途 |
+|---|---|
+| `cute_matmul_op` / `cute_blockscale_matmul_op` | 单次 matmul API（来自 Phase B / L1 tensor） |
+| `cute_vec_exp` / `cute_vec_sin` / `cute_vec_cos` | 原 RVV helper |
+| `cute_dequant_i32_to_f32_tile` / `cute_dequant_i32_to_bf16_tile` | I32 accumulator 后处理 |
+| `cute_silu_tile` / `cute_hadamard_tile` / `cute_resadd_tile` | elementwise |
+| `cute_rope_bf16_tile` / `cute_masked_softmax_bf16_tile` | sequence op |
+| `cute_smoothquant` / `cute_rmsnorm` / `cute_rmsnorm_with_scale` | 独立 quant/norm op |
 
-// 6 个 fusion 回调（与 cute_tiled_matmul 配合使用）
-cute_fusion_fn cute_fuse_dequant_rope_bf16cvt(void);    // proj_q, proj_k
-cute_fusion_fn cute_fuse_dequant_bf16cvt(void);         // proj_v
-cute_fusion_fn cute_fuse_masked_softmax_kvscale_bf16cvt(void);  // scores
-cute_fusion_fn cute_fuse_dequant_silu(void);             // ffn_gate
-cute_fusion_fn cute_fuse_dequant_hadamard(void);         // ffn_up
-cute_fusion_fn cute_fuse_dequant_resadd(void);           // proj_o, ffn_down
+#### C.3 fusion 回调函数
 
-// 直接调用版本（非回调，独立使用）
-void cute_fuse_dequant_rope_bf16cvt_direct(...);
-void cute_fuse_dequant_bf16cvt_direct(...);
-// ... etc
-```
+fusion 层不重新写数学逻辑，只把 primitive 组合成 `cute_tiled_matmul` post-op：
+
+| Fusion post-op | Primitive 组合 |
+|---|---|
+| `cute_fuse_dequant_rope_bf16cvt` | dequant_i32_to_f32 + rope_bf16 |
+| `cute_fuse_dequant_bf16cvt` | dequant_i32_to_bf16 + layout store |
+| `cute_fuse_masked_softmax_kvscale_bf16cvt` | masked_softmax_bf16 |
+| `cute_fuse_dequant_silu` | dequant_i32_to_f32 + silu |
+| `cute_fuse_dequant_hadamard` | dequant_i32_to_f32 + hadamard + row_absmax |
+| `cute_fuse_dequant_resadd` | dequant_i32_to_f32 + resadd |
 
 实际上，由于 fusion 函数的参数不完全统一（有的需要 pos，有的需要 output_scale），`cute_fusion_fn` 的 `void *ctx` 需要承载不同上下文。建议定义：
 
@@ -521,71 +537,48 @@ typedef struct {
 } cute_hadamard_ctx_t;
 ```
 
-#### C.3 独立操作
-
-```c
-// cute_quant.h
-
-// F32 → INT8 per-token 量化
-void cute_smoothquant(float *input, int dim_i, int dim_j,
-                      int8_t *output, float *output_scale,
-                      int need_stage1);
-
-// RMS 归一化
-void cute_rmsnorm(float *input, float *output,
-                  float *weight, float rms_epsilon,
-                  int batch, int seq_len, int hidden_dim);
-
-// RMS 归一化 + 提取 per-token absmax
-void cute_rmsnorm_with_scale(float *input, float *output,
-                             float *weight, float *per_token_scale,
-                             float rms_epsilon,
-                             int batch, int seq_len, int hidden_dim);
-```
-
-#### C.4 底层向量数学（internal）
-
-`cute_vec_math.h` 内部使用，不暴露给上层：
-
-```c
-// 来自 llama3_1B.c 的向量化实现，全部保留
-vfloat32m4_t vec_exp(vfloat32m4_t x, size_t vl);
-vfloat32m4_t vec_sin(vfloat32m4_t x, size_t vl);
-vfloat32m4_t vec_cos(vfloat32m4_t x, size_t vl);
-```
-
-#### C.5 CMake
+#### C.4 CMake
 
 ```cmake
-# L3: cutelib/fusion — CPU post-processing（header-only，依赖 cutelib_tensor）
+# L2: cutelib/primitive — standalone primitives（header-only）
+add_library(cutelib_primitive INTERFACE)
+target_include_directories(cutelib_primitive INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/primitive/include
+)
+target_link_libraries(cutelib_primitive INTERFACE cutelib_tensor)
+
+# L3: cutelib/fusion — CPU post-processing（header-only，依赖 primitive）
 add_library(cutelib_fusion INTERFACE)
 target_include_directories(cutelib_fusion INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/fusion/include
 )
-target_link_libraries(cutelib_fusion INTERFACE cutelib_tensor)
+target_link_libraries(cutelib_fusion INTERFACE cutelib_primitive)
 ```
 
-#### C.6 测试
+#### C.5 测试
 
-对每个 fusion 函数独立验证：
+先对单算子做独立验证，再对 fusion 组合做验证：
 
 | Test | 输入 | 验证 |
 |---|---|---|
-| `test_fuse_dequant_bf16cvt` | 64×64 I32 + scale | 输出与 llama3_1B.c 的函数 bit-exact |
-| `test_fuse_dequant_silu` | 64×64 I32 + scale | bit-exact |
+| `test_convert_dequant_bf16` | 64×64 I32 + scale | dequant/BF16 primitive bit-exact |
+| `test_elementwise_silu` | 64×64 F32 | SiLU primitive bit-exact |
+| `test_sequence_rope` | 64×64 F32 | RoPE primitive bit-exact |
 | `test_smoothquant` | 128×2048 F32 | 输出 INT8 + scale 与原实现一致 |
 | `test_rmsnorm` | 128×2048 F32 + weight | bit-exact |
+| `test_fuse_dequant_bf16cvt` | 64×64 I32 + scale | fused post-op bit-exact |
+| `test_fuse_dequant_silu` | 64×64 I32 + scale | fused post-op bit-exact |
 
 golden 数据来源：从 llama3_1B.c 中提取固定输入，截取中间结果作为 golden。
 
-### Phase D：L4 cutelib/model
+### Phase D：L4 cutelib/layer
 
 > 目标：用 L1-L3 的 API 编排 llama_block。
 
 #### D.1 目录结构
 
 ```text
-cutelib/model/
+cutelib/layer/
 └── include/
     └── cute_llama.h
 ```
@@ -636,12 +629,12 @@ void cute_llama_block(cute_llama_config_t *cfg, float *input, float *output);
 #### D.3 CMake
 
 ```cmake
-# L4: cutelib/model — model-level（header-only，依赖 cutelib_fusion）
-add_library(cutelib_model INTERFACE)
-target_include_directories(cutelib_model INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/model/include
+# L4: cutelib/layer — single transformer layer（header-only，依赖 cutelib_fusion）
+add_library(cutelib_layer INTERFACE)
+target_include_directories(cutelib_layer INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/layer/include
 )
-target_link_libraries(cutelib_model INTERFACE cutelib_fusion)
+target_link_libraries(cutelib_layer INTERFACE cutelib_fusion)
 ```
 
 #### D.4 端到端验证
@@ -660,25 +653,33 @@ test_llama_block:
 ## 5. 依赖图与执行顺序
 
 ```text
-Phase A (L1 runtime 扩展)
+Phase A (L0 runtime 扩展)
     │
     ▼
-Phase B (L2 tensor)
+Phase B (L1 tensor)
     │
     ├──────► Phase B 测试 (tensor correctness)
     │
     ▼
-Phase C (L3 fusion)
+Phase C0 (L2 single primitive)
     │
-    ├──────► Phase C 测试 (fusion correctness)
+    ├──────► Phase C0 测试 (ops correctness)
     │
     ▼
-Phase D (L4 model)
+Phase C1 (L3 fusion + pipeline post-op)
+    │
+    ├──────► Phase C1 测试 (fusion correctness)
+    │
+    ▼
+Phase D (L4 layer)
     │
     └──────► Phase D 端到端测试 (llama_block bit-exact)
+    │
+    ▼
+Phase E (L5 model, 预留)
 ```
 
-每个 Phase 内部可以并行开发（例如 B.1 tensor descriptor 和 C.2 fusion 函数无依赖关系），但测试必须按顺序。
+Phase C0 先把单个 matmul/vec/convert/elementwise/sequence/quant/norm 算子做成可独立验证的 primitive；Phase C1 再把这些 primitive 组合成 fused post-op 并接入 pipeline。L5 model 作为多层/完整模型编排预留，不阻塞 llama_block 单层验证。
 
 ---
 
@@ -700,25 +701,47 @@ Phase D (L4 model)
 | 创建 | `tests/tensor/matmul/tensor_matmul_i8_256_256_256_zeroinit/` |
 | 修改 | `CMakeLists.txt` |
 
-### Phase C: cutelib/fusion
+### Phase C0: cutelib/primitive
+
+| 操作 | 文件 |
+|------|------|
+| 创建 | `cutelib/primitive/include/cute_vec_math.h` |
+| 创建 | `cutelib/primitive/include/cute_convert.h` |
+| 创建 | `cutelib/primitive/include/cute_elementwise.h` |
+| 创建 | `cutelib/primitive/include/cute_sequence.h` |
+| 创建 | `cutelib/primitive/include/cute_quant.h` |
+| 创建 | `tests/primitive/test_vec_math/` |
+| 创建 | `tests/primitive/test_convert_dequant_bf16/` |
+| 创建 | `tests/primitive/test_smoothquant/` |
+| 创建 | `tests/primitive/test_rmsnorm/` |
+| 修改 | `CMakeLists.txt` |
+
+### Phase C1: cutelib/fusion
 
 | 操作 | 文件 |
 |------|------|
 | 创建 | `cutelib/fusion/include/cute_fusion.h` |
-| 创建 | `cutelib/fusion/include/cute_quant.h` |
-| 创建 | `cutelib/fusion/include/cute_vec_math.h` |
 | 创建 | `tests/fusion/test_fuse_dequant_bf16cvt.c` |
 | 创建 | `tests/fusion/test_fuse_dequant_silu.c` |
-| 创建 | `tests/fusion/test_smoothquant.c` |
-| 创建 | `tests/fusion/test_rmsnorm.c` |
+| 创建 | `tests/fusion/test_fuse_dequant_rope_bf16cvt.c` |
+| 创建 | `tests/fusion/test_fuse_dequant_hadamard.c` |
+| 创建 | `tests/fusion/test_fuse_masked_softmax_kvscale_bf16cvt.c` |
 | 修改 | `CMakeLists.txt` |
 
-### Phase D: cutelib/model
+### Phase D: cutelib/layer
 
 | 操作 | 文件 |
 |------|------|
-| 创建 | `cutelib/model/include/cute_llama.h` |
-| 创建 | `tests/model/test_llama_block.c` |
+| 创建 | `cutelib/layer/include/cute_llama.h` |
+| 创建 | `tests/layer/test_llama_block.c` |
+| 修改 | `CMakeLists.txt` |
+
+### Phase E: cutelib/model（预留）
+
+| 操作 | 文件 |
+|------|------|
+| 创建 | `cutelib/model/include/cute_model.h` |
+| 创建 | `tests/model/test_llama_model.c` |
 | 修改 | `CMakeLists.txt` |
 
 ---
