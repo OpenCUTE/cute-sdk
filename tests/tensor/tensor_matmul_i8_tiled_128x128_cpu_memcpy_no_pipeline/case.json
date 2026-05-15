@@ -1,8 +1,8 @@
 {
-  "id": "tensor_matmul_i8_tiled_128x128_cpu_memcpy_doublebuffer",
+  "id": "tensor_matmul_i8_tiled_128x128_cpu_memcpy_no_pipeline",
   "op_ref": "ops/tensor/matmul.yaml",
   "level": "tensor",
-  "description": "Tensor API tiled matmul using double_buf plus CPU memcpy post_op, checked by per-tile X-scan",
+  "description": "Tensor API tiled matmul using one scratch buffer plus CPU memcpy post_op, no pipeline, checked by per-tile X-scan",
   "bindings": {
     "A.dtype": "DataTypeI8I8I32",
     "A.shape": [128, 128],
@@ -13,7 +13,7 @@
     "blockscale": null,
     "tiling": "2x2 tiles of 64x64, K=128",
     "post_op": "cpu_memcpy",
-    "double_buffer": true
+    "pipeline": false
   },
   "build": {
     "source": "test.c",

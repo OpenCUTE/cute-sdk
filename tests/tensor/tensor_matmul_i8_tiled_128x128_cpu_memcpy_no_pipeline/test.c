@@ -1,6 +1,6 @@
 /**
- * Tensor-level tiled matmul test with CPU memcpy post_op.
- * CUTE writes each 64x64 tile to double_buf, then CPU copies it to output.
+ * Tensor-level tiled matmul test with CPU memcpy post_op and no pipeline.
+ * CUTE writes each 64x64 tile to one scratch buffer, then CPU copies it to output.
  * Each output tile is checked with an X-shaped scan against the golden output.
  */
 #include <stddef.h>
@@ -10,7 +10,7 @@
 #include "cute_ops.h"
 #include "../../runtime/runtime_matmul_i8_128_128_128_zeroinit/matmul_value_mnk_128_128_128_zeroinit.h"
 
-static int double_buf[CUTE_TILE_M][CUTE_TILE_N] __attribute__((aligned(256)));
+static int scratch_buf[CUTE_TILE_M][CUTE_TILE_N] __attribute__((aligned(256)));
 
 static void cpu_memcpy_post_op(
     void *cute_buf, void *final_out,
@@ -34,20 +34,8 @@ static void cpu_memcpy_post_op(
     }
 }
 
-int main(void) {
-    cute_tensor_t ta = {a, APPLICATION_K, APPLICATION_M, APPLICATION_K, CUTEDataTypeI8I8I32};
-    cute_tensor_t tb = {b, APPLICATION_K, APPLICATION_K, APPLICATION_N, CUTEDataTypeI8I8I32};
-    cute_tensor_t tc = {d, APPLICATION_N * sizeof(int), APPLICATION_M, APPLICATION_N, CUTEDataTypeI8I8I32};
-
-    cute_tiled_matmul(&ta, &tb,
-                      c, APPLICATION_N * sizeof(int),
-                      &tc,
-                      NULL, NULL,               /* no scale */
-                      CUTE_SCALE_NONE,
-                      BIAS_TYPE, 0,              /* zero init, no transpose */
-                      double_buf,                /* CUTE tile output buffer */
-                      cpu_memcpy_post_op, NULL); /* CPU copies tile to final output */
-
+static int check_output_xscan(void)
+{
     int tile_i = APPLICATION_M / CUTE_TILE_M;
     int tile_j = APPLICATION_N / CUTE_TILE_N;
 
@@ -72,4 +60,21 @@ int main(void) {
     }
 
     return 0;
+}
+
+int main(void) {
+    cute_tensor_t ta = {a, APPLICATION_K, APPLICATION_M, APPLICATION_K, CUTEDataTypeI8I8I32};
+    cute_tensor_t tb = {b, APPLICATION_K, APPLICATION_K, APPLICATION_N, CUTEDataTypeI8I8I32};
+    cute_tensor_t tc = {d, APPLICATION_N * sizeof(int), APPLICATION_M, APPLICATION_N, CUTEDataTypeI8I8I32};
+
+    cute_tiled_matmul_no_pipeline(&ta, &tb,
+                                  c, APPLICATION_N * sizeof(int),
+                                  &tc,
+                                  NULL, NULL,               /* no scale */
+                                  CUTE_SCALE_NONE,
+                                  BIAS_TYPE, 0,              /* zero init, no transpose */
+                                  scratch_buf,
+                                  cpu_memcpy_post_op, NULL);
+
+    return check_output_xscan();
 }
