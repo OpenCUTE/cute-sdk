@@ -467,6 +467,7 @@ tiled 测试需要 golden 数据（256×256 的 I8 matmul），可从 cutetest �
 ### Phase C：L3 cutelib/fusion
 
 > 目标：将 llama3_1B.c 中 7 个 fusion 函数 + 2 个独立操作迁入 cutelib/fusion/。
+> 细化计划：[`phaseC_fusion.md`](phaseC_fusion.md)
 
 #### C.1 目录结构
 
