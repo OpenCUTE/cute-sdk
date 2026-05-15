@@ -109,12 +109,20 @@ def main(argv: list[str] | None = None) -> int:
         default="D",
         help="Tensor name in manifest to compare (default: D)",
     )
+    parser.add_argument(
+        "--base-addr",
+        help="Base virtual address (hex) of the output tensor; "
+             "if omitted, uses first WriteRequest address from trace",
+    )
     args = parser.parse_args(argv)
 
     golden = GoldenTensor(args.manifest, tensor_name=args.tensor)
     trace = CMLStoreTrace(args.trace)
 
-    base = trace.get_base_address()
+    if args.base_addr:
+        base = int(args.base_addr, 16)
+    else:
+        base = trace.get_base_address()
     if base is None:
         print("[ERROR] No WriteRequest found in trace", file=sys.stderr)
         return 1

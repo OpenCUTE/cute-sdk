@@ -5,10 +5,19 @@
   "description": "INT8 matmul with transpose, M=N=K=128, zero init",
   "bindings": {
     "A.dtype": "DataTypeI8I8I32",
-    "A.shape": [128, 128],
-    "B.shape": [128, 128],
+    "A.shape": [
+      128,
+      128
+    ],
+    "B.shape": [
+      128,
+      128
+    ],
     "C.bias_mode": "TaskTypeTensorZeroLoad",
-    "D.shape": [128, 128],
+    "D.shape": [
+      128,
+      128
+    ],
     "transpose": true,
     "blockscale": null
   },
@@ -23,6 +32,7 @@
   "golden": "golden/manual/tensor/matmul_i8_128_128_128_zeroinit_transpose/manifest.json",
   "verify": {
     "mode": "bit_exact",
-    "tensor": "D"
+    "tensor": "D",
+    "symbol": "c"
   }
 }
