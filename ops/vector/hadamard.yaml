@@ -1,0 +1,93 @@
+op: hadamard
+level: primitive
+domain: elementwise
+version: 1
+
+description: |
+  Hadamard product primitive used by L2 cutelib/primitive and higher fusion ops.
+  This op multiplies two F32 tiles elementwise and optionally updates a per-row
+  absolute max buffer for later smoothquant. It does not perform dequant,
+  matmul, pipeline scheduling, or fused writeback.
+
+inputs:
+  A:
+    type: Tensor
+    description: Left F32 tile, typically ffn_gate after SiLU.
+    dtype: F32
+    shape: [M, N]
+    stride: a_stride
+  B:
+    type: Tensor
+    description: Right F32 tile, typically ffn_up after dequant.
+    dtype: F32
+    shape: [M, N]
+    stride: b_stride
+  row_absmax_in:
+    type: Tensor
+    required: false
+    description: Existing per-row absmax values to accumulate into.
+    dtype: F32
+    shape: [M]
+
+outputs:
+  Y:
+    type: Tensor
+    description: Output F32 tile. Y may alias B for the ffn_up path.
+    dtype: F32
+    shape: [M, N]
+    stride: y_stride
+  row_absmax_out:
+    type: Tensor
+    required: false
+    description: Updated per-row absolute max values.
+    dtype: F32
+    shape: [M]
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows.
+  N:
+    type: int
+    description: Number of active columns.
+  accumulate_absmax:
+    type: bool
+    default: true
+    description: Whether row_absmax_out accumulates max(old, tile_absmax).
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference path is fuse_ops_DEQUANT_HADAMARD after dequant.
+
+semantics: |
+  For each active element:
+
+    Y[m][n] = A[m][n] * B[m][n]
+
+  If row absmax is enabled:
+
+    tile_absmax[m] = max_n(abs(Y[m][n]))
+    row_absmax_out[m] = max(row_absmax_in[m], tile_absmax[m])
+
+  The max accumulation is required when FFN_DIMENSION is split across multiple
+  N tiles. Later tiles must not overwrite a larger absmax produced by earlier
+  tiles.
+
+constraints:
+  - A.dtype == B.dtype == Y.dtype == F32
+  - A.shape == B.shape == Y.shape == [M, N]
+  - M > 0 and N > 0
+  - row_absmax_in/out are required when accumulate_absmax is true
+  - No dequant is performed by this op.
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must include an N > 64 or multi-tile case for absmax accumulation.
+
+test_plan:
+  case_id: test_elementwise_hadamard
+  case_path: tests/primitive/test_elementwise_hadamard
+  golden_source: llama3_1B.c reference path after dequant
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y
+      - row_absmax_out

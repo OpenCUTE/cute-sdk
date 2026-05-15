@@ -1,0 +1,90 @@
+op: masked_softmax
+level: primitive
+domain: sequence
+version: 1
+
+description: |
+  Masked softmax primitive used by L2 cutelib/primitive and higher fusion ops.
+  This op consumes F32 score tiles, applies scale and causal/attention mask,
+  computes softmax row-wise, and writes BF16/F16 storage using the reference
+  conversion path. It does not perform matmul or pipeline scheduling.
+
+inputs:
+  X:
+    type: Tensor
+    description: F32 score tile.
+    dtype: F32
+    shape: [M, N]
+    stride: x_stride
+  mask:
+    type: Tensor
+    description: Bit-packed attention mask. A true bit means the element is valid.
+    dtype: U1_PACKED
+    shape: [mask_rows, N]
+    stride: mask_stride_bits
+
+outputs:
+  Y:
+    type: Tensor
+    description: Softmax output in BF16/F16 storage.
+    dtype: BF16_OR_F16_STORAGE
+    shape: [M, N]
+    stride: y_stride
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows.
+  N:
+    type: int
+    description: Number of active columns / context length for this score tile.
+  row0:
+    type: int
+    description: Global row offset used for mask lookup.
+  col0:
+    type: int
+    default: 0
+    description: Global column offset. Phase C0 expects col0 = 0 for full-row softmax.
+  scale:
+    type: F32
+    default: INV_SQRT_KEY_DIMENSION
+    description: Multiplicative score scale before softmax.
+  masked_fill:
+    type: F32
+    value: -90.0
+    description: Reference finite fill used for masked values during exp/sum stage.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference path is fuse_ops_MASKED_SOFTMAX_KVSCALE_BF16CVRT after score matmul.
+
+semantics: |
+  For each active row m:
+
+    scaled[n] = X[m][n] * scale
+    valid[n] = mask[row0 + m][col0 + n]
+    max_val = max(valid[n] ? scaled[n] : -inf)
+    exp_val[n] = exp(valid[n] ? scaled[n] - max_val : masked_fill)
+    sum_exp = sum_n(exp_val[n])
+    Y[m][n] = bf16_or_reference_f16(exp_val[n] / sum_exp)
+
+  The implementation must preserve the reference max/sum/reduction and
+  conversion behavior from llama3_1B.c.
+
+constraints:
+  - X.dtype == F32
+  - Y.shape == X.shape == [M, N]
+  - M > 0 and N > 0
+  - col0 == 0 for Phase C0 full-row softmax tests
+  - No matmul is performed by this op.
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must cover causal mask behavior and row0 > 0.
+
+test_plan:
+  case_id: test_sequence_masked_softmax
+  case_path: tests/primitive/test_sequence_masked_softmax
+  golden_source: llama3_1B.c reference path after score matmul
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y

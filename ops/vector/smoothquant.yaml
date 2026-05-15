@@ -1,0 +1,90 @@
+op: smoothquant
+level: primitive
+domain: quant
+version: 1
+
+description: |
+  SmoothQuant activation quantization primitive used by L2 cutelib/primitive
+  and higher layer/model code. It quantizes F32 activations to INT8 per token.
+  With need_stage1=true it first computes the per-token absmax-derived scale;
+  with need_stage1=false it consumes an existing scale buffer.
+
+inputs:
+  X:
+    type: Tensor
+    description: Input F32 activation matrix.
+    dtype: F32
+    shape: [M, N]
+  scale_in:
+    type: Tensor
+    required: false
+    description: Existing per-token scale, required when need_stage1 is false.
+    dtype: F32
+    shape: [M]
+
+outputs:
+  Q:
+    type: Tensor
+    description: Quantized INT8 activation matrix.
+    dtype: I8
+    shape: [M, N]
+  scale_out:
+    type: Tensor
+    description: Per-token quantization scale.
+    dtype: F32
+    shape: [M]
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows / tokens.
+  N:
+    type: int
+    description: Number of active columns / hidden dimension.
+  need_stage1:
+    type: bool
+    description: Whether to compute scale_out from absmax before quantization.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference function is smoothquant.
+
+semantics: |
+  If need_stage1 is true:
+
+    token_max[m] = max_n(abs(X[m][n]))
+    scale_out[m] = token_max[m] / 127.0
+
+  If need_stage1 is false:
+
+    scale_out[m] is treated as pre-populated scale_in[m].
+
+  Quantization:
+
+    inv_scale[m] = scale_out[m] ? 1.0 / scale_out[m] : 0.0
+    Q[m][n] = int8_round_to_nearest_even(X[m][n] * inv_scale[m])
+
+  The integer narrowing and rounding path must match the RVV reference.
+
+constraints:
+  - X.dtype == F32
+  - Q.dtype == I8
+  - X.shape == Q.shape == [M, N]
+  - scale_out.shape == [M]
+  - N % (64 * 4) == 0
+  - M % 16 == 0
+  - scale_in/scale_out must be valid when need_stage1 is false
+  - No CUTE accelerator instruction may be issued by this op.
+
+test_plan:
+  case_id: test_smoothquant
+  case_path: tests/primitive/test_smoothquant
+  golden_source: llama3_1B.c smoothquant output dump
+  variants:
+    - need_stage1_true
+    - need_stage1_false
+  verify:
+    mode: bit_exact
+    tensors:
+      - Q
+      - scale_out

@@ -1,0 +1,118 @@
+op: vec_math
+level: primitive
+domain: vector
+version: 1
+
+description: |
+  Vector math primitives used by L2 cutelib/primitive and higher fusion ops.
+  These functions are standalone numerical helpers ported from
+  cutetest/transformer_test/llama/llama3_1B.c. They do not issue CUTE
+  hardware instructions and must not depend on llama global buffers.
+
+functions:
+  fast_sqrt:
+    api: cute_fast_sqrt
+    kind: scalar
+    description: Scalar F32 sqrt using the same instruction path as the reference.
+    inputs:
+      x:
+        dtype: F32
+        shape: []
+    outputs:
+      y:
+        dtype: F32
+        shape: []
+    semantics: y = sqrt(x)
+
+  vec_exp:
+    api: cute_vec_exp
+    kind: rvv
+    description: RVV F32 vector exponential helper.
+    inputs:
+      x:
+        dtype: F32
+        shape: [vl]
+      vl:
+        dtype: size_t
+        shape: []
+    outputs:
+      y:
+        dtype: F32
+        shape: [vl]
+    semantics: y[i] = exp(x[i])
+
+  vec_sin:
+    api: cute_vec_sin
+    kind: rvv
+    description: RVV F32 vector sine helper.
+    inputs:
+      x:
+        dtype: F32
+        shape: [vl]
+      vl:
+        dtype: size_t
+        shape: []
+    outputs:
+      y:
+        dtype: F32
+        shape: [vl]
+    semantics: y[i] = sin(x[i])
+
+  vec_cos:
+    api: cute_vec_cos
+    kind: rvv
+    description: RVV F32 vector cosine helper.
+    inputs:
+      x:
+        dtype: F32
+        shape: [vl]
+      vl:
+        dtype: size_t
+        shape: []
+    outputs:
+      y:
+        dtype: F32
+        shape: [vl]
+    semantics: y[i] = cos(x[i])
+
+attributes:
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference implementation used for bit-exact migration.
+
+  vector_extension:
+    type: string
+    value: riscv_vector
+    description: RVV intrinsics are required for vector functions.
+
+  precision:
+    type: enum
+    values:
+      - F32
+    description: Phase C0 vector primitives operate on float32 values.
+
+semantics: |
+  Each primitive maps one input element to one output element independently,
+  except fast_sqrt which is scalar. Implementations must preserve the reference
+  arithmetic path from llama3_1B.c, including polynomial coefficients,
+  range-reduction constants, RVV intrinsic sequence, and rounding behavior.
+
+constraints:
+  - No CUTE accelerator instruction may be issued by these primitives.
+  - No llama3_1B.c global buffer or global shape constant may be required.
+  - vec_exp, vec_sin, and vec_cos operate on exactly vl active lanes.
+  - Inputs and outputs are F32.
+  - Tests must compare against the reference helper outputs bit-exactly.
+
+test_plan:
+  case_id: test_vec_math
+  case_path: tests/primitive/test_vec_math
+  golden_source: llama3_1B.c reference helper output dump
+  verify:
+    mode: bit_exact
+    tensors:
+      - fast_sqrt.y
+      - vec_exp.y
+      - vec_sin.y
+      - vec_cos.y

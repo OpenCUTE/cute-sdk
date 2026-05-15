@@ -1,0 +1,79 @@
+op: rope
+level: primitive
+domain: sequence
+version: 1
+
+description: |
+  RoPE primitive used by L2 cutelib/primitive and higher fusion ops. This op
+  consumes an F32 tile that has already been dequantized and writes BF16/F16
+  storage using the same layout as the llama3_1B.c reference. It does not
+  perform dequant, matmul, or pipeline scheduling.
+
+inputs:
+  X:
+    type: Tensor
+    description: Dequantized F32 input tile.
+    dtype: F32
+    shape: [M, head_dim]
+    stride: x_stride
+  rope_theta:
+    type: Tensor
+    description: RoPE theta/inv-frequency values.
+    dtype: F32
+    shape: [head_dim / 2]
+
+outputs:
+  Y:
+    type: Tensor
+    description: RoPE output in reference BF16/F16 storage layout.
+    dtype: BF16_OR_F16_STORAGE
+    shape: [M, head_dim]
+    stride: y_stride
+
+attributes:
+  pos:
+    type: int
+    description: Sequence position offset. Effective row position is pos + m.
+  head_dim:
+    type: int
+    default: 64
+    description: Head dimension. Must be even.
+  M:
+    type: int
+    description: Number of active rows.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference path is fuse_ops_DEQUANT_ROPE_BF16CVRT after dequant.
+
+semantics: |
+  Let half_dim = head_dim / 2 and pos_m = pos + m.
+  For k in [0, half_dim):
+
+    angle = rope_theta[k] * pos_m
+    real = X[m][2*k]
+    imag = X[m][2*k + 1]
+    real_out = real * cos(angle) - imag * sin(angle)
+    imag_out = real * sin(angle) + imag * cos(angle)
+
+  The reference writes real_out to Y[m][k] and imag_out to
+  Y[m][half_dim + k], converted with the same F16/BF16 storage path as
+  llama3_1B.c.
+
+constraints:
+  - X.dtype == F32
+  - head_dim % 2 == 0
+  - rope_theta.shape == [head_dim / 2]
+  - M > 0
+  - No dequant is performed by this op.
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must cover pos = 0 and pos > 0.
+
+test_plan:
+  case_id: test_sequence_rope
+  case_path: tests/primitive/test_sequence_rope
+  golden_source: llama3_1B.c reference path after dequant
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y

@@ -1,0 +1,65 @@
+op: resadd
+level: primitive
+domain: elementwise
+version: 1
+
+description: |
+  Residual-add elementwise primitive used by L2 cutelib/primitive and higher
+  fusion ops. This op only adds two F32 tiles. It does not perform dequant,
+  matmul, pipeline scheduling, or fused writeback.
+
+inputs:
+  X:
+    type: Tensor
+    description: Main F32 tile.
+    dtype: F32
+    shape: [M, N]
+    stride: x_stride
+  Residual:
+    type: Tensor
+    description: Residual F32 tile or view with matching active shape.
+    dtype: F32
+    shape: [M, N]
+    stride: residual_stride
+
+outputs:
+  Y:
+    type: Tensor
+    description: Output F32 tile. Y may alias X or Residual if caller guarantees safe order.
+    dtype: F32
+    shape: [M, N]
+    stride: y_stride
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows.
+  N:
+    type: int
+    description: Number of active columns.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference path is fuse_ops_DEQUANT_RESADD after dequant.
+
+semantics: |
+  For each active element:
+
+    Y[m][n] = X[m][n] + Residual[m][n]
+
+constraints:
+  - X.dtype == Residual.dtype == Y.dtype == F32
+  - X.shape == Residual.shape == Y.shape == [M, N]
+  - M > 0 and N > 0
+  - No dequant is performed by this op.
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must compare against the reference helper output bit-exactly.
+
+test_plan:
+  case_id: test_elementwise_resadd
+  case_path: tests/primitive/test_elementwise_resadd
+  golden_source: llama3_1B.c reference path after dequant
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y

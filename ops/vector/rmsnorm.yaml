@@ -1,0 +1,114 @@
+op: rmsnorm
+level: primitive
+domain: norm
+version: 1
+
+description: |
+  RMSNorm primitives used by L2 cutelib/primitive and higher layer/model code.
+  This spec covers both plain RMSNorm and RMSNorm with per-token absmax scale
+  extraction. These ops consume F32 tensors and produce F32 tensors.
+
+functions:
+  rmsnorm:
+    api: cute_rmsnorm
+    description: RMSNorm without per-token quantization scale output.
+    outputs:
+      Y:
+        dtype: F32
+        shape: [B, S, H]
+
+  rmsnorm_with_scale:
+    api: cute_rmsnorm_with_scale
+    description: RMSNorm plus per-token absmax-derived scale output.
+    outputs:
+      Y:
+        dtype: F32
+        shape: [B, S, H]
+      per_token_scale:
+        dtype: F32
+        shape: [B, S]
+
+inputs:
+  X:
+    type: Tensor
+    description: Input F32 tensor.
+    dtype: F32
+    shape: [B, S, H]
+  weight:
+    type: Tensor
+    description: Per-channel RMSNorm weight.
+    dtype: F32
+    shape: [H]
+
+outputs:
+  Y:
+    type: Tensor
+    description: Output F32 tensor.
+    dtype: F32
+    shape: [B, S, H]
+  per_token_scale:
+    type: Tensor
+    required: false
+    description: Optional per-token scale produced by rmsnorm_with_scale.
+    dtype: F32
+    shape: [B, S]
+
+attributes:
+  B:
+    type: int
+    description: Batch size.
+  S:
+    type: int
+    description: Sequence length.
+  H:
+    type: int
+    description: Hidden dimension.
+  rms_epsilon:
+    type: F32
+    description: Epsilon added to mean square before reciprocal sqrt.
+  with_scale:
+    type: bool
+    default: false
+    description: Whether to produce per_token_scale.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference functions are RMSnorm and RMSnorm_With_getabsmax_scale.
+
+semantics: |
+  For each batch b and token s:
+
+    mean_square = sum_h(X[b][s][h] * X[b][s][h]) / H
+    rms = 1.0 / sqrt(mean_square + rms_epsilon)
+    Y[b][s][h] = X[b][s][h] * rms * weight[h]
+
+  If with_scale is true:
+
+    token_max = max_h(abs(Y[b][s][h]))
+    per_token_scale[b][s] = token_max / 127.0
+
+  The sqrt/reduction path must match the llama3_1B.c reference.
+
+constraints:
+  - X.dtype == weight.dtype == Y.dtype == F32
+  - X.shape == Y.shape == [B, S, H]
+  - weight.shape == [H]
+  - H % (64 * 4) == 0
+  - S % 16 == 0 for the plain RMSnorm reference path
+  - per_token_scale is required when with_scale is true
+  - No CUTE accelerator instruction may be issued by this op.
+
+test_plan:
+  cases:
+    - case_id: test_rmsnorm
+      case_path: tests/primitive/test_rmsnorm
+      with_scale: false
+    - case_id: test_rmsnorm_with_scale
+      case_path: tests/primitive/test_rmsnorm_with_scale
+      with_scale: true
+  golden_source: llama3_1B.c RMSnorm output dumps
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y
+      - per_token_scale

@@ -1,0 +1,125 @@
+op: dequant
+level: primitive
+domain: convert
+version: 1
+
+description: |
+  I32 accumulator dequantization primitives used by L2 cutelib/primitive and
+  higher fusion ops. These ops convert CUTE matmul I32 output tiles to F32 or
+  BF16/F16-format output tiles using per-token activation scale and per-tensor
+  weight scale. They do not issue CUTE hardware instructions.
+
+functions:
+  dequant_i32_scalar:
+    api: cute_dequant_i32
+    kind: scalar
+    inputs:
+      acc:
+        dtype: I32
+        shape: []
+      input_scale:
+        dtype: F32
+        shape: []
+      weight_scale:
+        dtype: F32
+        shape: []
+    outputs:
+      y:
+        dtype: F32
+        shape: []
+    semantics: y = float(acc) * input_scale * weight_scale
+
+  dequant_i32_to_f32_tile:
+    api: cute_dequant_i32_to_f32_tile
+    kind: tile
+    inputs:
+      X:
+        type: Tensor
+        dtype: I32
+        shape: [M, N]
+        stride: x_stride
+      input_scale:
+        type: Tensor
+        dtype: F32
+        shape: [M]
+      weight_scale:
+        type: Tensor
+        dtype: F32
+        shape: [1]
+    outputs:
+      Y:
+        type: Tensor
+        dtype: F32
+        shape: [M, N]
+        stride: y_stride
+    semantics: Y[m][n] = float(X[m][n]) * input_scale[m] * weight_scale[0]
+
+  dequant_i32_to_bf16_tile:
+    api: cute_dequant_i32_to_bf16_tile
+    kind: tile
+    inputs:
+      X:
+        type: Tensor
+        dtype: I32
+        shape: [M, N]
+        stride: x_stride
+      input_scale:
+        type: Tensor
+        dtype: F32
+        shape: [M]
+      weight_scale:
+        type: Tensor
+        dtype: F32
+        shape: [1]
+    outputs:
+      Y:
+        type: Tensor
+        dtype: BF16_OR_F16_STORAGE
+        shape: [M, N]
+        stride: y_stride
+    semantics: Y[m][n] = bf16_or_reference_f16(float(X[m][n]) * input_scale[m] * weight_scale[0])
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows.
+  N:
+    type: int
+    description: Number of active columns.
+  scale_type:
+    type: enum
+    default: per_token_a_per_tensor_b
+    values:
+      - per_token_a_per_tensor_b
+    description: Phase C0 only supports per-token activation scale and per-tensor weight scale.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference paths are fuse_ops_DEQUANT_* stage 1 plus BF16/F16 conversion.
+
+semantics: |
+  Dequantization maps CUTE I32 accumulators to F32 using:
+
+    scale[m] = input_scale[m] * weight_scale[0]
+    f32[m][n] = float(i32[m][n]) * scale[m]
+
+  The BF16/F16 storage variant must preserve the reference conversion path used
+  by llama3_1B.c. Do not replace the conversion with a different rounding mode.
+
+constraints:
+  - X.dtype == I32
+  - input_scale.dtype == weight_scale.dtype == F32
+  - X.shape == Y.shape == [M, N]
+  - M > 0 and N > 0
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must compare against the reference output bit-exactly.
+
+test_plan:
+  case_id: test_convert_dequant_bf16
+  case_path: tests/primitive/test_convert_dequant_bf16
+  golden_source: llama3_1B.c reference dequant and convert path
+  verify:
+    mode: bit_exact
+    tensors:
+      - f32
+      - bf16_or_reference_f16

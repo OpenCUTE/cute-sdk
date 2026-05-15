@@ -1,0 +1,66 @@
+op: silu
+level: primitive
+domain: elementwise
+version: 1
+
+description: |
+  SiLU elementwise primitive used by L2 cutelib/primitive and higher fusion ops.
+  This op only consumes and produces F32 tile data. It does not perform dequant,
+  matmul, pipeline scheduling, or fused writeback.
+
+inputs:
+  X:
+    type: Tensor
+    description: Input F32 tile.
+    dtype: F32
+    shape: [M, N]
+    stride: x_stride
+
+outputs:
+  Y:
+    type: Tensor
+    description: Output F32 tile. Y may alias X for in-place operation.
+    dtype: F32
+    shape: [M, N]
+    stride: y_stride
+
+attributes:
+  M:
+    type: int
+    description: Number of active rows.
+  N:
+    type: int
+    description: Number of active columns.
+  in_place:
+    type: bool
+    default: true
+    description: Whether output aliases input.
+  implementation_source:
+    type: string
+    value: cutetest/transformer_test/llama/llama3_1B.c
+    description: Reference path is fuse_ops_DEQUANT_SILU after dequant.
+
+semantics: |
+  For each active element:
+
+    Y[m][n] = X[m][n] / (1.0 + exp(-X[m][n]))
+
+  The exp implementation must follow the same arithmetic path used by the
+  migrated vector math primitive when vectorized.
+
+constraints:
+  - X.dtype == Y.dtype == F32
+  - X.shape == Y.shape == [M, N]
+  - M > 0 and N > 0
+  - No dequant is performed by this op.
+  - No CUTE accelerator instruction may be issued by this op.
+  - Tests must compare against the reference helper output bit-exactly.
+
+test_plan:
+  case_id: test_elementwise_silu
+  case_path: tests/primitive/test_elementwise_silu
+  golden_source: llama3_1B.c reference path after dequant
+  verify:
+    mode: bit_exact
+    tensors:
+      - Y
