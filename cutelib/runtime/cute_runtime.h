@@ -62,4 +62,56 @@ static inline uint64_t cute_blockscale_matmul(
     return CUTE_SEND_MACRO_INST();
 }
 
+/* ---- FIFO 状态查询（非阻塞） ---- */
+
+// 返回已完成任务的 bitmask，bit N = 1 表示 task_id=N 的指令已完成
+static inline uint64_t cute_query_finish(void) {
+    return CUTE_QUERY_MACRO_INST_FINISH();
+}
+
+// FIFO 是否已满（1=满，0=未满）
+static inline int cute_fifo_full(void) {
+    return CUTE_QUERY_MACRO_INST_FIFO_FULL() != 0;
+}
+
+// FIFO 当前占用状态（bitmask，bit N = 1 表示位置 N 有指令）
+static inline uint64_t cute_fifo_info(void) {
+    return CUTE_QUERY_MACRO_INST_FIFO_INFO();
+}
+
+/* ---- 等待与出队 ---- */
+
+// 阻塞等待特定 task_id 完成，然后出队队首
+//
+// FIFO 顺序约束：
+//   1. wait+dequeue 严格按 issue 顺序调用（不能跳过中间 task）
+//   2. task_id 必须是当前 FIFO 中最早进入的那条未完成指令
+//   3. 先 issue 的必定先完成，不存在乱序完成
+static inline void cute_wait_task(uint64_t task_id) {
+    uint64_t mask = 1UL << task_id;
+    while (!(CUTE_QUERY_MACRO_INST_FINISH() & mask))
+        ;
+    CUTE_CLEAR_INST();
+}
+
+/* ---- 位置查询 ---- */
+
+// 返回已完成宏指令的尾编号位置
+static inline uint64_t cute_query_inst_tail(void) {
+    return CUTE_QUERY_INST();
+}
+
+/* ---- 加速器状态 ---- */
+
+// 对外访存读次数
+static inline uint64_t cute_query_mem_read_count(void) {
+    return CUTE_QUERY_MEM_READ_COUNT();
+}
+
+// 对外访存写次数
+static inline uint64_t cute_query_mem_write_count(void) {
+    return CUTE_QUERY_MEM_WRITE_COUNT();
+}
+
+
 #endif /* CUTE_RUNTIME_H */
