@@ -47,13 +47,70 @@ static inline uint64_t cute_blockscale_matmul_op(
         a->dtype, bias_mode, transpose, m_index);
 }
 
-/* ---- Fusion 回调类型 ---- */
-typedef void (*cute_fusion_fn)(
-    void *cute_buf, void *final_out,
-    float *a_scale, float *b_scale,
-    int dim_i, int dim_j,
-    uint64_t cute_stride, uint64_t out_stride,
-    void *ctx);
+/* ---- Post-op 回调类型 ---- */
+typedef struct {
+    void *src;
+    void *dst;
+    uint64_t src_stride;
+    uint64_t dst_stride;
+    int rows;
+    int cols;
+    int tile_i;
+    int tile_j;
+    int row0;
+    int col0;
+} cute_post_tile_t;
+
+typedef struct {
+    float *a_scale;
+    float *b_scale;
+    int scale_type;
+    int bias_mode;
+    int transpose;
+} cute_post_env_t;
+
+typedef struct {
+    cute_post_tile_t tile;
+    cute_post_env_t env;
+    void *user_ctx;
+} cute_post_call_t;
+
+typedef void (*cute_post_op_fn)(const cute_post_call_t *call);
+
+static inline void cute_run_post_op(
+    cute_post_op_fn post_op,
+    void *src,
+    void *dst,
+    uint64_t src_stride,
+    uint64_t dst_stride,
+    float *a_scale,
+    float *b_scale,
+    int scale_type,
+    int bias_mode,
+    int transpose,
+    int tile_i,
+    int tile_j,
+    void *user_ctx)
+{
+    cute_post_call_t call;
+    call.tile.src = src;
+    call.tile.dst = dst;
+    call.tile.src_stride = src_stride;
+    call.tile.dst_stride = dst_stride;
+    call.tile.rows = CUTE_TILE_M;
+    call.tile.cols = CUTE_TILE_N;
+    call.tile.tile_i = tile_i;
+    call.tile.tile_j = tile_j;
+    call.tile.row0 = tile_i * CUTE_TILE_M;
+    call.tile.col0 = tile_j * CUTE_TILE_N;
+    call.env.a_scale = a_scale ? a_scale + call.tile.row0 : NULL;
+    call.env.b_scale = b_scale;
+    call.env.scale_type = scale_type;
+    call.env.bias_mode = bias_mode;
+    call.env.transpose = transpose;
+    call.user_ctx = user_ctx;
+    post_op(&call);
+}
 
 /* ---- Tiled Matmul without post-op pipeline ---- */
 static inline void cute_tiled_matmul_no_pipeline(
@@ -65,7 +122,7 @@ static inline void cute_tiled_matmul_no_pipeline(
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
     void *double_buf,
-    cute_fusion_fn post_op,
+    cute_post_op_fn post_op,
     void *post_ctx)
 {
     int M = (int)a->rows, N = (int)b->cols, K = (int)a->cols;
@@ -138,11 +195,10 @@ static inline void cute_tiled_matmul_no_pipeline(
 
             cute_wait_task(tid);
 
-            post_op(double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
-                    a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
-                    b_scale,
-                    CUTE_TILE_M, CUTE_TILE_N,
-                    tile_out_stride, output_stride, post_ctx);
+            cute_run_post_op(post_op, double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
+                             tile_out_stride, output_stride,
+                             a_scale, b_scale, scale_type, bias_mode, transpose,
+                             prev_ti, prev_tj, post_ctx);
 
             /* Issue current tile into double_buf after CPU has copied prev. */
             tid = cute_matmul(
@@ -157,11 +213,10 @@ static inline void cute_tiled_matmul_no_pipeline(
 
         /* Drain last tile */
         cute_wait_task(tid);
-        post_op(double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
-                a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
-                b_scale,
-                CUTE_TILE_M, CUTE_TILE_N,
-                tile_out_stride, output_stride, post_ctx);
+        cute_run_post_op(post_op, double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
+                         tile_out_stride, output_stride,
+                         a_scale, b_scale, scale_type, bias_mode, transpose,
+                         prev_ti, prev_tj, post_ctx);
     }
 
     #undef _TILE_OUT_PTR
@@ -179,7 +234,7 @@ static inline void cute_tiled_matmul_pipeline(
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
     void *double_buf0, void *double_buf1,
-    cute_fusion_fn post_op,
+    cute_post_op_fn post_op,
     void *post_ctx)
 {
     int M = (int)a->rows, N = (int)b->cols, K = (int)a->cols;
@@ -232,11 +287,10 @@ static inline void cute_tiled_matmul_pipeline(
             CUTE_TILE_M, CUTE_TILE_N, K,
             a->dtype, bias_mode, transpose, 0);
 
-        post_op(bufs[prev_buf], _TILE_OUT_PTR(prev_ti, prev_tj),
-                a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
-                b_scale,
-                CUTE_TILE_M, CUTE_TILE_N,
-                tile_out_stride, output_stride, post_ctx);
+        cute_run_post_op(post_op, bufs[prev_buf], _TILE_OUT_PTR(prev_ti, prev_tj),
+                         tile_out_stride, output_stride,
+                         a_scale, b_scale, scale_type, bias_mode, transpose,
+                         prev_ti, prev_tj, post_ctx);
 
         prev_ti = ti;
         prev_tj = tj;
@@ -244,11 +298,10 @@ static inline void cute_tiled_matmul_pipeline(
     }
 
     cute_wait_task(tid);
-    post_op(bufs[prev_buf], _TILE_OUT_PTR(prev_ti, prev_tj),
-            a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
-            b_scale,
-            CUTE_TILE_M, CUTE_TILE_N,
-            tile_out_stride, output_stride, post_ctx);
+    cute_run_post_op(post_op, bufs[prev_buf], _TILE_OUT_PTR(prev_ti, prev_tj),
+                     tile_out_stride, output_stride,
+                     a_scale, b_scale, scale_type, bias_mode, transpose,
+                     prev_ti, prev_tj, post_ctx);
 
     #undef _TILE_OUT_PTR
     #undef _TILE_A_PTR
@@ -265,7 +318,7 @@ static inline void cute_tiled_matmul(
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
     void *double_buf,
-    cute_fusion_fn post_op,
+    cute_post_op_fn post_op,
     void *post_ctx)
 {
     cute_tiled_matmul_no_pipeline(a, b, output, output_stride, bias,

@@ -12,24 +12,16 @@
 
 static int scratch_buf[2][CUTE_TILE_M][CUTE_TILE_N] __attribute__((aligned(256)));
 
-static void cpu_memcpy_post_op(
-    void *cute_buf, void *final_out,
-    float *a_scale, float *b_scale,
-    int dim_i, int dim_j,
-    uint64_t cute_stride, uint64_t out_stride,
-    void *ctx)
+static void cpu_memcpy_post_op(const cute_post_call_t *call)
 {
-    (void)a_scale;
-    (void)b_scale;
-    (void)ctx;
+    const cute_post_tile_t *tile = &call->tile;
+    size_t row_bytes = (size_t)tile->cols * sizeof(int);
+    char *src = (char *)tile->src;
+    char *dst = (char *)tile->dst;
 
-    size_t row_bytes = (size_t)dim_j * sizeof(int);
-    char *src = (char *)cute_buf;
-    char *dst = (char *)final_out;
-
-    for (int i = 0; i < dim_i; i++) {
-        memcpy(dst + (size_t)i * out_stride,
-               src + (size_t)i * cute_stride,
+    for (int i = 0; i < tile->rows; i++) {
+        memcpy(dst + (size_t)i * tile->dst_stride,
+               src + (size_t)i * tile->src_stride,
                row_bytes);
     }
 }

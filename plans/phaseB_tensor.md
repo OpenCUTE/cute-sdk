@@ -54,21 +54,35 @@ static inline uint64_t cute_matmul_op(
 
 类似，映射到 `cute_blockscale_matmul()`。
 
-### cute_fusion_fn — fusion 回调类型
+### cute_post_op_fn — struct-based 后处理回调类型
 
 ```c
-typedef void (*cute_fusion_fn)(
-    void *cute_buf, void *final_out,
-    float *a_scale, float *b_scale,
-    int dim_i, int dim_j,
-    uint64_t cute_stride, uint64_t out_stride,
-    void *ctx);
+typedef struct {
+    void *src, *dst;
+    uint64_t src_stride, dst_stride;
+    int rows, cols;
+    int tile_i, tile_j;
+    int row0, col0;
+} cute_post_tile_t;
+
+typedef struct {
+    float *a_scale, *b_scale;
+    int scale_type, bias_mode, transpose;
+} cute_post_env_t;
+
+typedef struct {
+    cute_post_tile_t tile;
+    cute_post_env_t env;
+    void *user_ctx;
+} cute_post_call_t;
+
+typedef void (*cute_post_op_fn)(const cute_post_call_t *call);
 ```
 
-### cute_tiled_matmul — 核心 tiled matmul
+### cute_tiled_matmul_no_pipeline / cute_tiled_matmul_pipeline — 核心 tiled matmul
 
 ```c
-static inline void cute_tiled_matmul(
+static inline void cute_tiled_matmul_no_pipeline(
     const cute_tensor_t *a,      // [M, K]
     const cute_tensor_t *b,      // [K, N]
     void *output,                // 最终输出 [M, N]
@@ -77,16 +91,24 @@ static inline void cute_tiled_matmul(
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
     void *double_buf,            // >= CUTE_TILE_M * CUTE_TILE_N * 4 字节（post_op 时用）
-    cute_fusion_fn post_op,      // NULL = 直接写入 output
+    cute_post_op_fn post_op,     // NULL = 直接写入 output
+    void *post_ctx)
+
+static inline void cute_tiled_matmul_pipeline(
+    ...,
+    void *double_buf0,           // tile scratch buffer 0
+    void *double_buf1,           // tile scratch buffer 1
+    cute_post_op_fn post_op,
     void *post_ctx)
 ```
 
-**两种路径**：
+**三种路径**：
 
 1. **post_op == NULL（直接写入）**：CUTE 直接写到 output 对应象限，不需要 double_buf。
-2. **post_op != NULL（单 buffer pipeline）**：CUTE 写到 double_buf，wait 完成后 CPU 调 post_op 处理 double_buf → output，然后再 issue 下一个 tile（写同一个 double_buf）。
+2. **no_pipeline + post_op != NULL**：CUTE 写到单个 double_buf，wait 完成后 CPU 调 post_op 处理 double_buf → output，然后再 issue 下一个 tile。
+3. **pipeline + post_op != NULL**：CUTE 在 double_buf0/1 间轮转，wait(prev) 后先 issue tile N 到另一个 buffer，再让 CPU post_op 处理 tile N-1 的 buffer。
 
-**Pipeline 算法**（修复迁移计划的 bug）：
+**No-pipeline 算法**：
 
 ```
 线性化 tiles: (0,0), (0,1), (1,0), (1,1) ...
@@ -95,18 +117,31 @@ total = tile_i * tile_j
 1. Issue tile 0
 2. for n = 1 .. total-1:
      wait(prev_tid)
-     issue tile n
      if post_op: post_op(buf -> output_quadrant(prev))
+     issue tile n
 3. wait(last_tid)
    if post_op: post_op(buf -> output_quadrant(last))
 ```
 
-overlap 发生在：CUTE 算 tile N+1 的同时，CPU 做 tile N 的 post_op。
+**Pipeline 算法**：
+
+```
+1. Issue tile 0 into buf0
+2. for n = 1 .. total-1:
+     wait(prev_tid)
+     issue tile n into buf[n & 1]
+     post_op(buf[prev] -> output_quadrant(prev))
+3. wait(last_tid)
+   post_op(buf[last] -> output_quadrant(last))
+```
+
+overlap 发生在：CUTE 算 tile N 的同时，CPU 做 tile N-1 的 post_op。
 
 **关键修复**：
-- 先 issue 第一个 tile，然后 wait+issue+post_op 循环（修复计划中缺少首 tile issue 的 bug）
+- 先 issue 第一个 tile，然后 wait+issue/post_op 循环（修复计划中缺少首 tile issue 的 bug）
 - bias/output 命名替代 c/d（消除歧义）
-- 只需 1 个 double_buf（深度 1 pipeline，够用且简单）
+- no_pipeline 单 buffer 必须先 CPU consume 再复用，避免覆盖
+- pipeline 使用两个 scratch buffer 才允许 issue next 和 CPU post_op overlap
 
 ## Step 3: CMake 集成
 
@@ -127,6 +162,8 @@ function(add_tensor_test case_dir) ... endfunction()
 | tensor_matmul_i8_128_128_128_zeroinit_transpose | transpose 路径 | 复用 runtime transpose 的 golden |
 | tensor_matmul_mxfp8e4m3_64_64_64_zeroinit | blockscale 路径 | 复用 runtime 的 golden |
 | tensor_matmul_i8_tiled_128x128_fifo | cute_tiled_matmul 结果 = 单次 matmul | 复用 128x128 golden |
+| tensor_matmul_i8_tiled_128x128_cpu_memcpy_no_pipeline | 单 buffer CPU post_op 路径，per-tile X-scan 自检 | 复用 128x128 golden |
+| tensor_matmul_i8_tiled_128x128_cpu_memcpy_pipeline | 双 buffer CPU post_op pipeline 路径，per-tile X-scan 自检 | 复用 128x128 golden |
 
 测试数据通过相对路径引用 runtime 测试的 .h 文件。
 
