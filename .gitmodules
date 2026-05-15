@@ -1,0 +1,3 @@
+[submodule "cuteqemu"]
+	path = cuteqemu
+	url = git@github.com:OpenCUTE/qemu.git
