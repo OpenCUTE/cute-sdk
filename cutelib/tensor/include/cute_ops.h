@@ -132,13 +132,19 @@ static inline void cute_tiled_matmul(
             a->dtype, bias_mode, transpose, 0);
         int prev_ti = ti0, prev_tj = tj0;
 
-        /* Pipeline: wait → issue next → post_op on prev (overlap) */
+        /* With one scratch tile, CPU must consume it before CUTE reuses it. */
         for (int n = 1; n < total; n++) {
             int ti = n / tile_j, tj = n % tile_j;
 
             cute_wait_task(tid);
 
-            /* Issue current tile into double_buf */
+            post_op(double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
+                    a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
+                    b_scale,
+                    CUTE_TILE_M, CUTE_TILE_N,
+                    tile_out_stride, output_stride, post_ctx);
+
+            /* Issue current tile into double_buf after CPU has copied prev. */
             tid = cute_matmul(
                 _TILE_A_PTR(ti), a->stride,
                 _TILE_B_PTR(tj), b->stride,
@@ -146,19 +152,14 @@ static inline void cute_tiled_matmul(
                 double_buf, tile_out_stride,
                 CUTE_TILE_M, CUTE_TILE_N, K,
                 a->dtype, bias_mode, transpose, 0);
-
-            /* Post_op on previous tile (overlaps with CUTE compute) */
-            post_op(double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
-                    a_scale + prev_ti * CUTE_TILE_M, b_scale,
-                    CUTE_TILE_M, CUTE_TILE_N,
-                    tile_out_stride, output_stride, post_ctx);
             prev_ti = ti; prev_tj = tj;
         }
 
         /* Drain last tile */
         cute_wait_task(tid);
         post_op(double_buf, _TILE_OUT_PTR(prev_ti, prev_tj),
-                a_scale + prev_ti * CUTE_TILE_M, b_scale,
+                a_scale ? a_scale + prev_ti * CUTE_TILE_M : NULL,
+                b_scale,
                 CUTE_TILE_M, CUTE_TILE_N,
                 tile_out_stride, output_stride, post_ctx);
     }

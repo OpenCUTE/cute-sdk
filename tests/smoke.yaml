@@ -10,6 +10,7 @@ cases:
   - tensor_matmul_i8_128_128_128_zeroinit_transpose
   - tensor_matmul_mxfp8e4m3_64_64_64_zeroinit
   - tensor_matmul_i8_tiled_128x128_fifo
+  - tensor_matmul_i8_tiled_128x128_cpu_memcpy_doublebuffer
 verify:
   mode: bit_exact
   tensor: D
