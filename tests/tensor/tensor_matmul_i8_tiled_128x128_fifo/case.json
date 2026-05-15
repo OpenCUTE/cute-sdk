@@ -1,0 +1,30 @@
+{
+  "id": "tensor_matmul_i8_tiled_128x128_fifo",
+  "op_ref": "ops/tensor/matmul.yaml",
+  "level": "tensor",
+  "description": "Tensor API tiled matmul (2x2 tiles of 64x64x128) via cute_tiled_matmul",
+  "bindings": {
+    "A.dtype": "DataTypeI8I8I32",
+    "A.shape": [128, 128],
+    "B.shape": [128, 128],
+    "C.bias_mode": "TaskTypeTensorZeroLoad",
+    "D.shape": [128, 128],
+    "transpose": false,
+    "blockscale": null,
+    "tiling": "2x2 tiles of 64x64, K=128"
+  },
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/tensor/matmul_i8_128_128_128_zeroinit/manifest.json",
+  "verify": {
+    "mode": "bit_exact",
+    "tensor": "D",
+    "symbol": "c"
+  }
+}

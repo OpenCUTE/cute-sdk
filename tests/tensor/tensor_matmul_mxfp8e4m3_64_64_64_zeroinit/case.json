@@ -1,0 +1,29 @@
+{
+  "id": "tensor_matmul_mxfp8e4m3_64_64_64_zeroinit",
+  "op_ref": "ops/tensor/matmul.yaml",
+  "level": "tensor",
+  "description": "Tensor API blockscale matmul equivalence, M=N=K=64, zero init",
+  "bindings": {
+    "A.dtype": "DataTypeMxfp8e4m3F32",
+    "A.shape": [64, 64],
+    "B.shape": [64, 64],
+    "C.bias_mode": "TaskTypeTensorZeroLoad",
+    "D.shape": [64, 64],
+    "transpose": true,
+    "blockscale": {"scale_a": true, "scale_b": true}
+  },
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/tensor/matmul_mxfp8e4m3_64_64_64_zeroinit/manifest.json",
+  "verify": {
+    "mode": "bit_exact",
+    "tensor": "D",
+    "symbol": "c"
+  }
+}

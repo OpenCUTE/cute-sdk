@@ -28,6 +28,15 @@ target_include_directories(cutelib_runtime INTERFACE
 target_link_libraries(cutelib_runtime INTERFACE cuteisa)
 
 # ============================================================
+# L2: cutelib/tensor — tensor API（header-only，依赖 cutelib_runtime）
+# ============================================================
+add_library(cutelib_tensor INTERFACE)
+target_include_directories(cutelib_tensor INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/tensor/include
+)
+target_link_libraries(cutelib_tensor INTERFACE cutelib_runtime)
+
+# ============================================================
 # Tests
 # ============================================================
 
@@ -54,3 +63,31 @@ add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit)
 add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit_transpose)
 add_runtime_test(runtime_matmul_mxfp8e4m3_64_64_64_zeroinit)
 add_runtime_test(runtime_matmul_i8_tiled_128x128_fifo)
+
+# ============================================================
+# Tensor-level tests
+# ============================================================
+
+function(add_tensor_test case_dir)
+    get_filename_component(case_name ${case_dir} NAME)
+    set(test_src ${CMAKE_CURRENT_SOURCE_DIR}/tests/tensor/${case_dir}/test.c)
+    set(data_dir  ${CMAKE_CURRENT_SOURCE_DIR}/tests/tensor/${case_dir})
+
+    if(NOT EXISTS ${test_src})
+        message(WARNING "Skipping ${case_name}: test.c not found")
+        return()
+    endif()
+
+    add_executable(${case_name} ${test_src})
+    target_include_directories(${case_name} PRIVATE ${data_dir})
+    target_link_libraries(${case_name} PRIVATE cutelib_tensor)
+    set_target_properties(${case_name} PROPERTIES
+        SUFFIX .riscv
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/tensor
+    )
+endfunction()
+
+add_tensor_test(tensor_matmul_i8_128_128_128_zeroinit)
+add_tensor_test(tensor_matmul_i8_128_128_128_zeroinit_transpose)
+add_tensor_test(tensor_matmul_mxfp8e4m3_64_64_64_zeroinit)
+add_tensor_test(tensor_matmul_i8_tiled_128x128_fifo)
