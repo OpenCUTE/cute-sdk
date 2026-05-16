@@ -187,11 +187,17 @@ Phase C1 的 fusion 函数只负责把这些 primitive 串起来，并适配 `cu
 
 ### 5.1 golden 来源
 
+详细生成方案见 `plans/phaseC0_rvv_golden_generation.md`。Phase C0 golden
+默认由 NVWA/llama reference RVV binary 在 `cuteqemu/build/qemu-riscv64` 上
+执行后 dump `manifest.json + *.bin`。
+
 优先级：
 
-1. 直接调用 `llama3_1B.c` 原函数 dump 中间 tile。
-2. 使用 cutetest 里已有的中间结果头文件。
-3. 对纯 scalar/elementwise 函数，可用原函数同代码路径生成 small golden。
+1. 使用 NVWA `llama3.2_1B/data_flow/gloden_opt.h` 和 standalone RVV
+   primitive 生成 small golden。
+2. 对 `dequant/resadd/hadamard` 等缺少 standalone op 的函数，从
+   `llama3_1B.c` fusion 函数中拆出单 stage reference。
+3. 使用 cutetest 里已有的中间结果头文件作为兼容性补充。
 
 不要手写复杂 golden，尤其不要手写 softmax/RoPE。
 
