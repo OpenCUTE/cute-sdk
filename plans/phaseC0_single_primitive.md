@@ -253,3 +253,82 @@ Phase C0 完成时必须满足：
 - 不实现 `cute_llama_block`。
 - 不做 attention head/model layer 编排。
 - 不优化算法，只迁移和拆分原实现。
+
+---
+
+## 9. Implementation plan
+
+### 9.1 文件清单
+
+**Primitive headers** (`cutelib/primitive/include/`):
+
+| 文件 | 内容 | 来源 |
+|---|---|---|
+| `cute_vec_math.h` | `cute_fast_sqrt`, `cute_vec_exp/sin/cos` | nvwa_gloden_opt.h |
+| `cute_convert.h` | `cute_dequant_i32_to_f32_tile`, `cute_dequant_i32_to_f16_tile` | nvwa_llama_primitives.h + cvrtfp16 |
+| `cute_elementwise.h` | `cute_silu_tile`, `cute_hadamard_tile`, `cute_resadd_tile` | nvwa_llama_primitives.h |
+| `cute_sequence.h` | `cute_rope_f16_tile`, `cute_masked_softmax_f16_tile` | nvwa_gloden_opt.h |
+| `cute_quant.h` | `cute_smoothquant`, `cute_rmsnorm`, `cute_rmsnorm_with_scale` | nvwa_gloden_opt.h + nvwa_llama_primitives.h |
+
+**Tests** (`tests/primitive/<case>/test.c`):
+
+每个 case 目录已有 `case.json`，补 `test.c`：
+
+| 目录 | 验证 |
+|---|---|
+| `vec_math_n256/` | exp/sin/cos bit-exact |
+| `dequant_f32_m64_n64/` | I32→F32 bit-exact |
+| `dequant_f16_m64_n64/` | I32→F16 bit-exact |
+| `silu_m128_n128/` | silu bit-exact |
+| `resadd_m64_n64/` | resadd bit-exact |
+| `hadamard_m64_n128/` | hadamard + row_absmax bit-exact |
+| `rope_pos0_m64_head_dim64_n_head1/` | RoPE pos0 F16 bit-exact |
+| `rope_pos17_m64_head_dim64_n_head1/` | RoPE pos17 F16 bit-exact |
+| `masked_softmax_m64_n128/` | causal softmax F16 bit-exact |
+| `smoothquant_m128_k2048/` | I8 + scale bit-exact |
+| `rmsnorm_batch1_seq_len128_hidden_dim2048/` | rmsnorm F32 bit-exact |
+| `rmsnorm_scale_batch1_seq_len128_hidden_dim2048/` | rmsnorm + per_token_scale bit-exact |
+
+### 9.2 迁移规则
+
+- 只改命名空间（`__gloden_*` → `cute_*`），不改常量、泰勒系数、intrinsic 顺序、rounding 路径
+- 每个 header 自包含，`#include <riscv_vector.h>` + `<stdint.h>`
+- 不依赖 llama_block、cute_tiled_matmul、pipeline
+
+### 9.3 CMakeLists.txt 改动
+
+新增 `cutelib_primitive` interface library 和 `add_primitive_test()` 函数：
+
+```cmake
+add_library(cutelib_primitive INTERFACE)
+target_include_directories(cutelib_primitive INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/primitive/include
+)
+target_link_libraries(cutelib_primitive INTERFACE cutelib_runtime)
+```
+
+每个 primitive test 链接 `cutelib_primitive` 和 `-lm`。
+
+### 9.4 测试模式
+
+每个 `test.c`：
+1. `#include` 对应 golden `.h`（static const 数组）
+2. 分配 input buffer，从 golden 拷贝输入
+3. 调用 `cute_*` primitive
+4. `memcmp` 输出与 golden 数组
+5. exit 0 = pass，非 0 = fail
+
+### 9.5 执行顺序
+
+| 步骤 | 内容 |
+|---|---|
+| 1 | 创建 `cutelib/primitive/include/` 目录和 5 个 header |
+| 2 | 迁移 vec math（fast_sqrt/vec_exp/vec_sin/vec_cos） |
+| 3 | 迁移 convert（dequant_i32_to_f32 + cvrtfp16） |
+| 4 | 迁移 elementwise（silu/resadd/hadamard） |
+| 5 | 迁移 sequence（rope + masked_softmax） |
+| 6 | 迁移 quant（smoothquant/rmsnorm/rmsnorm_with_scale） |
+| 7 | 更新 CMakeLists.txt 添加 cutelib_primitive 和 test 函数 |
+| 8 | 编写 12 个 test.c |
+| 9 | 更新 case.json 添加 build 字段 |
+| 10 | cmake + make 验证全部 bit-exact |
