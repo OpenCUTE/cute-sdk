@@ -15,8 +15,7 @@ from memverify.readers.golden_tensor import GoldenTensor
 
 @dataclass
 class Mismatch:
-    row: int
-    col: int
+    byte_index: int
     byte_offset: int
     expected: int
     actual: int
@@ -46,7 +45,7 @@ class CompareResult:
             lines.append(f"  First mismatches (up to 20):")
             for m in self.mismatches:
                 lines.append(
-                    f"  [{m.row}][{m.col}] offset={m.byte_offset} "
+                    f"  byte[{m.byte_index}] offset={m.byte_offset} "
                     f"expected={m.expected} ({m.expected_hex}) "
                     f"actual={m.actual} ({m.actual_hex})"
                 )
@@ -58,27 +57,25 @@ _MAX_REPORTED_MISMATCHES = 20
 
 def compare(
     golden: GoldenTensor,
-    actual: list[list[int]],
+    actual: bytes,
 ) -> CompareResult:
-    rows, cols = golden.shape
-    total = golden.element_count()
+    expected_bytes = golden.raw_bytes()
+    total = len(expected_bytes)
     matched = 0
     mismatches: list[Mismatch] = []
 
-    for r in range(rows):
-        for c in range(cols):
-            expected = golden[r, c]
-            actual_val = actual[r][c]
-            if expected == actual_val:
-                matched += 1
-            elif len(mismatches) < _MAX_REPORTED_MISMATCHES:
-                mismatches.append(Mismatch(
-                    row=r,
-                    col=c,
-                    byte_offset=golden._offset(r, c),
-                    expected=expected,
-                    actual=actual_val,
-                ))
+    for index in range(total):
+        expected = expected_bytes[index]
+        actual_val = actual[index] if index < len(actual) else 0
+        if expected == actual_val:
+            matched += 1
+        elif len(mismatches) < _MAX_REPORTED_MISMATCHES:
+            mismatches.append(Mismatch(
+                byte_index=index,
+                byte_offset=index,
+                expected=expected,
+                actual=actual_val,
+            ))
 
     mismatch_count = total - matched
     return CompareResult(
@@ -88,6 +85,16 @@ def compare(
         mismatch_count=mismatch_count,
         mismatches=mismatches,
     )
+
+
+def _parse_tile_shape(value: str) -> tuple[int, int]:
+    try:
+        rows_text, cols_text = value.lower().split("x", 1)
+        return int(rows_text), int(cols_text)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(
+            f"tile shape must be ROWSxCOLS, got {value!r}"
+        ) from error
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -114,20 +121,40 @@ def main(argv: list[str] | None = None) -> int:
         help="Base virtual address (hex) of the output tensor; "
              "if omitted, uses first WriteRequest address from trace",
     )
+    parser.add_argument(
+        "--layout",
+        choices=("direct", "tiled_cpu_memcpy"),
+        default="direct",
+        help="Trace reconstruction layout (default: direct)",
+    )
+    parser.add_argument(
+        "--tile-shape",
+        type=_parse_tile_shape,
+        default=(64, 64),
+        help="Tile shape for tiled_cpu_memcpy layout, formatted ROWSxCOLS",
+    )
     args = parser.parse_args(argv)
 
     golden = GoldenTensor(args.manifest, tensor_name=args.tensor)
     trace = CMLStoreTrace(args.trace)
 
-    if args.base_addr:
-        base = int(args.base_addr, 16)
+    if args.layout == "tiled_cpu_memcpy":
+        actual = trace.get_tiled_cpu_memcpy_tensor_bytes(
+            golden.shape,
+            golden.stride_bytes,
+            golden.element_bits,
+            args.tile_shape,
+        )
     else:
-        base = trace.get_base_address()
-    if base is None:
-        print("[ERROR] No WriteRequest found in trace", file=sys.stderr)
-        return 1
+        if args.base_addr:
+            base = int(args.base_addr, 16)
+        else:
+            base = trace.get_base_address()
+        if base is None:
+            print("[ERROR] No WriteRequest found in trace", file=sys.stderr)
+            return 1
 
-    actual = trace.get_tensor(base, golden.shape, golden.stride_bytes, golden.element_bits)
+        actual = trace.get_tensor_bytes(base, golden.shape, golden.stride_bytes, golden.element_bits)
     result = compare(golden, actual)
     print(result.report())
     return 0 if result.passed else 1

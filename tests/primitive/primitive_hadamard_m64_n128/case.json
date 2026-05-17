@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/hadamard_m64_n128/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_hadamard_output",
+        "symbol": "output"
+      }
+    ]
   }
 }

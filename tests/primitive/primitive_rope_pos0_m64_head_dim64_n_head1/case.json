@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/rope_pos0_m64_head_dim64_n_head1/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_rope_output_f16",
+        "symbol": "output"
+      }
+    ]
   }
 }

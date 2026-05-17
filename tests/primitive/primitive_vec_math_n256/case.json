@@ -12,6 +12,20 @@
   },
   "golden": "golden/manual/vector/vec_math_n256/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_vec_math_exp",
+        "symbol": "out_exp"
+      },
+      {
+        "tensor": "golden_vec_math_sin",
+        "symbol": "out_sin"
+      },
+      {
+        "tensor": "golden_vec_math_cos",
+        "symbol": "out_cos"
+      }
+    ]
   }
 }

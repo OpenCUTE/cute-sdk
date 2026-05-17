@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/resadd_m64_n64/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_resadd_output",
+        "symbol": "output"
+      }
+    ]
   }
 }

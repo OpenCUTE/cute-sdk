@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/dequant_f16_m64_n64/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_dequant_output_f16",
+        "symbol": "output"
+      }
+    ]
   }
 }

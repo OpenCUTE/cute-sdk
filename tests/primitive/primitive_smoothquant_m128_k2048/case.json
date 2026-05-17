@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/smoothquant_m128_k2048/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_smoothquant_output_i8",
+        "symbol": "output"
+      }
+    ]
   }
 }

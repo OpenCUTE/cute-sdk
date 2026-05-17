@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/rmsnorm_batch1_seq_len128_hidden_dim2048/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_rmsnorm_output",
+        "symbol": "output"
+      }
+    ]
   }
 }

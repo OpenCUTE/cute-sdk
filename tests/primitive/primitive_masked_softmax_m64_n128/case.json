@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/masked_softmax_m64_n128/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_softmax_output_f16",
+        "symbol": "output"
+      }
+    ]
   }
 }

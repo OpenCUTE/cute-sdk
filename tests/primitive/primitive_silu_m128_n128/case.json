@@ -12,6 +12,12 @@
   },
   "golden": "golden/manual/vector/silu_m128_n128/manifest.json",
   "verify": {
-    "mode": "return_code"
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_silu_golden_y",
+        "symbol": "data"
+      }
+    ]
   }
 }
