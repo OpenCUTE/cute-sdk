@@ -1,6 +1,6 @@
 hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
 build: false
-parallel: 10
+parallel: 12
 cases:
   - primitive_vec_math_n256
   - primitive_dequant_f32_m64_n64
