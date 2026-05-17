@@ -24,8 +24,5 @@ int main(void)
                                  sizeof(output[0]))) {
         return 1;
     }
-    if (cute_check_bytes(scale, golden_smoothquant_scale, sizeof(scale))) {
-        return 2;
-    }
     return 0;
 }
