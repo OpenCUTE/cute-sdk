@@ -1,9 +1,0 @@
-{
-  "id": "silu_m128_n128",
-  "op_ref": "ops/vector/silu.yaml",
-  "level": "primitive",
-  "golden": "../../golden/manual/vector/silu_m128_n128/manifest.json",
-  "verify": {
-    "mode": "bit_exact"
-  }
-}

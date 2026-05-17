@@ -1,9 +1,0 @@
-{
-  "id": "vec_math_n256",
-  "op_ref": "ops/vector/vec_math.yaml",
-  "level": "primitive",
-  "golden": "../../golden/manual/vector/vec_math_n256/manifest.json",
-  "verify": {
-    "mode": "bit_exact"
-  }
-}

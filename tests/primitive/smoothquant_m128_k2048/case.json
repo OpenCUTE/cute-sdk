@@ -1,9 +1,0 @@
-{
-  "id": "smoothquant_m128_k2048",
-  "op_ref": "ops/vector/smoothquant.yaml",
-  "level": "primitive",
-  "golden": "../../golden/manual/vector/smoothquant_m128_k2048/manifest.json",
-  "verify": {
-    "mode": "bit_exact"
-  }
-}

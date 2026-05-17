@@ -1,0 +1,17 @@
+{
+  "id": "primitive_vec_math_n256",
+  "op_ref": "ops/vector/vec_math.yaml",
+  "level": "primitive",
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/vector/vec_math_n256/manifest.json",
+  "verify": {
+    "mode": "return_code"
+  }
+}

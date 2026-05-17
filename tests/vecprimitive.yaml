@@ -1,0 +1,16 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 10
+cases:
+  - primitive_vec_math_n256
+  - primitive_dequant_f32_m64_n64
+  - primitive_dequant_f16_m64_n64
+  - primitive_silu_m128_n128
+  - primitive_resadd_m64_n64
+  - primitive_hadamard_m64_n128
+  - primitive_rope_pos0_m64_head_dim64_n_head1
+  - primitive_rope_pos17_m64_head_dim64_n_head1
+  - primitive_masked_softmax_m64_n128
+  - primitive_smoothquant_m128_k2048
+  - primitive_rmsnorm_batch1_seq_len128_hidden_dim2048
+  - primitive_rmsnorm_scale_batch1_seq_len128_hidden_dim2048

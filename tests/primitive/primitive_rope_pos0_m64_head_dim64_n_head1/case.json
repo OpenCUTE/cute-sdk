@@ -1,0 +1,17 @@
+{
+  "id": "primitive_rope_pos0_m64_head_dim64_n_head1",
+  "op_ref": "ops/vector/rope_pos0.yaml",
+  "level": "primitive",
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/vector/rope_pos0_m64_head_dim64_n_head1/manifest.json",
+  "verify": {
+    "mode": "return_code"
+  }
+}

@@ -104,9 +104,19 @@ class GoldenTensor:
     def _flat_offset(self, flat_idx: int) -> int:
         return flat_idx * self._element_bytes
 
+    def _offset(self, row: int, col: int = 0) -> int:
+        """Return byte offset for a 1-D/2-D tensor element."""
+        if self._ndim == 1:
+            return row * self._element_bytes
+        return row * self._stride_bytes + col * self._element_bytes
+
     def _read_element(self, offset: int):
         if self._element_bits == 32:
-            return struct.unpack_from("<f", self._data, offset)[0]
+            if self._dtype in ("F32", "FP32"):
+                return struct.unpack_from("<f", self._data, offset)[0]
+            if self._dtype in ("U32",):
+                return struct.unpack_from("<I", self._data, offset)[0]
+            return struct.unpack_from("<i", self._data, offset)[0]
         elif self._element_bits == 16:
             # F16 or BF16
             raw = struct.unpack_from("<H", self._data, offset)[0]

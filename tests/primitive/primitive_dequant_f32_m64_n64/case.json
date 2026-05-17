@@ -1,0 +1,17 @@
+{
+  "id": "primitive_dequant_f32_m64_n64",
+  "op_ref": "ops/vector/dequant_f32.yaml",
+  "level": "primitive",
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/vector/dequant_f32_m64_n64/manifest.json",
+  "verify": {
+    "mode": "return_code"
+  }
+}

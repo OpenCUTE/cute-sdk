@@ -52,6 +52,10 @@ def make_case_id(name, params):
     return "_".join(id_parts)
 
 
+def make_test_case_id(golden_case_id):
+    return f"primitive_{golden_case_id}"
+
+
 # ---------------------------------------------------------------------------
 # Parse .h content and extract arrays → .bin files
 # ---------------------------------------------------------------------------
@@ -218,17 +222,25 @@ def write_manifest(case_dir, case_id, case_name, params, tensors, h_filename):
     return manifest_path
 
 
-def write_test_case(case_id, case_name, golden_manifest_rel):
-    """Create tests/primitive/<case_id>/case.json referencing the golden manifest."""
-    test_dir = SDK_ROOT / "tests" / "primitive" / case_id
+def write_test_case(test_case_id, case_name, golden_manifest_rel):
+    """Create tests/primitive/<test_case_id>/case.json referencing the golden manifest."""
+    test_dir = SDK_ROOT / "tests" / "primitive" / test_case_id
     test_dir.mkdir(parents=True, exist_ok=True)
     case = {
-        "id": case_id,
+        "id": test_case_id,
         "op_ref": f"ops/vector/{case_name}.yaml",
         "level": "primitive",
+        "build": {
+            "source": "test.c",
+            "target": "test.riscv",
+        },
+        "run": {
+            "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+            "trace_source": "run.out",
+        },
         "golden": str(golden_manifest_rel),
         "verify": {
-            "mode": "bit_exact",
+            "mode": "return_code",
         },
     }
     case_path = test_dir / "case.json"
@@ -289,8 +301,8 @@ def run_case(qemu, qemu_cpu, binary, case_dir, case_id, case_name, params):
     print(f"    manifest.json")
 
     # Write tests/primitive/<case_id>/case.json
-    golden_rel = Path("..") / ".." / manifest_path.relative_to(SDK_ROOT)
-    test_case_path = write_test_case(case_id, case_name, golden_rel)
+    golden_rel = manifest_path.relative_to(SDK_ROOT)
+    test_case_path = write_test_case(make_test_case_id(case_id), case_name, golden_rel)
     print(f"    test -> {test_case_path.relative_to(SDK_ROOT)}")
 
 

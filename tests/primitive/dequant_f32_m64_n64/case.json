@@ -1,9 +1,0 @@
-{
-  "id": "dequant_f32_m64_n64",
-  "op_ref": "ops/vector/dequant_f32.yaml",
-  "level": "primitive",
-  "golden": "../../golden/manual/vector/dequant_f32_m64_n64/manifest.json",
-  "verify": {
-    "mode": "bit_exact"
-  }
-}
