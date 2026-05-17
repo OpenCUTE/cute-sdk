@@ -2,6 +2,7 @@
   "id": "hadamard_m64_n128",
   "op": "hadamard",
   "level": "primitive",
+  "op_ref": "ops/vector/hadamard.yaml",
   "tensors": {
     "golden_hadamard_lhs": {
       "path": "golden_hadamard_lhs.bin",
@@ -54,6 +55,15 @@
   "attributes": {
     "m": 64,
     "n": 128
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_hadamard_lhs",
+      "golden_hadamard_rhs",
+      "golden_hadamard_output",
+      "golden_hadamard_row_absmax"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

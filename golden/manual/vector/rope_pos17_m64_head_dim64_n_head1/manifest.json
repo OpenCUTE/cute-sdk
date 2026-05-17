@@ -2,6 +2,7 @@
   "id": "rope_pos17_m64_head_dim64_n_head1",
   "op": "rope_pos17",
   "level": "primitive",
+  "op_ref": "ops/vector/rope_pos17.yaml",
   "tensors": {
     "golden_rope_input": {
       "path": "golden_rope_input.bin",
@@ -42,6 +43,14 @@
     "head_dim": 64,
     "n_head": 1,
     "rope_pos": 17
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_rope_input",
+      "golden_rope_theta",
+      "golden_rope_output_f16"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

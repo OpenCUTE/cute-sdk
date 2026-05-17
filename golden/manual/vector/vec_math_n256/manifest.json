@@ -2,6 +2,7 @@
   "id": "vec_math_n256",
   "op": "vec_math",
   "level": "primitive",
+  "op_ref": "ops/vector/vec_math.yaml",
   "tensors": {
     "golden_vec_math_input_x": {
       "path": "golden_vec_math_input_x.bin",
@@ -50,6 +51,15 @@
   },
   "attributes": {
     "n": 256
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_vec_math_input_x",
+      "golden_vec_math_exp",
+      "golden_vec_math_sin",
+      "golden_vec_math_cos"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

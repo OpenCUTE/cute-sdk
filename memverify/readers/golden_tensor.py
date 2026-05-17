@@ -1,11 +1,20 @@
 """Golden tensor loader.
 
 Reads golden.bin + manifest.json and provides tensor element access.
+Supports F32, F16, BF16, I32, I16, I8, U8, U1_PACKED dtypes and 1D/2D/3D shapes.
 """
 
 import json
 import struct
 from pathlib import Path
+
+
+# struct format char + whether it's a float type
+_DTYPE_READERS = {
+    32: ("<f", True),
+    16: ("<e", True),   # F16 (IEEE754 half)
+    8:  ("<b", False),
+}
 
 
 class GoldenTensor:
@@ -20,21 +29,29 @@ class GoldenTensor:
         elif "tensors" in self._manifest:
             output = self._manifest["tensors"][tensor_name]
         else:
-            raise ValueError(
-                "manifest must have 'output' or 'tensors' key"
-            )
-        self._element_bits = output["element_bits"]
-        self._element_bytes = self._element_bits // 8
-        self._shape = tuple(output["shape"])
-        self._stride_bytes = output["stride_bytes"]
-        self._layout = output.get("layout", "row_major")
-        self._total_bytes = output.get(
-            "total_bytes",
-            (self._shape[0] - 1) * self._stride_bytes + self._shape[1] * self._element_bytes,
-        )
+            raise ValueError("manifest must have 'output' or 'tensors' key")
 
-        self._rows = self._shape[0]
-        self._cols = self._shape[1]
+        self._element_bits = output["element_bits"]
+        self._element_bytes = max(self._element_bits // 8, 1)
+        self._shape = tuple(output["shape"])
+        self._ndim = len(self._shape)
+        self._layout = output.get("layout", "row_major")
+        self._dtype = output.get("dtype", "")
+
+        # total_bytes: prefer explicit, otherwise compute from shape
+        self._total_bytes = output.get("total_bytes")
+        if self._total_bytes is None:
+            self._total_bytes = 1
+            for s in self._shape:
+                self._total_bytes *= s
+            self._total_bytes *= self._element_bytes
+
+        # stride: use explicit or compute row-major last-dim stride
+        self._stride_bytes = output.get("stride_bytes")
+        if self._stride_bytes is None and self._ndim >= 2:
+            self._stride_bytes = self._shape[-1] * self._element_bytes
+        elif self._stride_bytes is None:
+            self._stride_bytes = self._total_bytes
 
         golden_path = self._manifest_path.parent / output["path"]
         with open(golden_path, "rb") as f:
@@ -55,6 +72,10 @@ class GoldenTensor:
         return self._shape
 
     @property
+    def dtype(self) -> str:
+        return self._dtype
+
+    @property
     def element_bits(self) -> int:
         return self._element_bits
 
@@ -70,32 +91,54 @@ class GoldenTensor:
     def total_bytes(self) -> int:
         return self._total_bytes
 
+    @property
+    def ndim(self) -> int:
+        return self._ndim
+
     def element_count(self) -> int:
-        return self._rows * self._cols
+        n = 1
+        for s in self._shape:
+            n *= s
+        return n
 
-    def _offset(self, row: int, col: int) -> int:
-        if self._layout == "row_major":
-            return row * self._stride_bytes + col * self._element_bytes
-        else:
-            return col * self._stride_bytes + row * self._element_bytes
+    def _flat_offset(self, flat_idx: int) -> int:
+        return flat_idx * self._element_bytes
 
-    def _read_element(self, offset: int) -> int:
+    def _read_element(self, offset: int):
         if self._element_bits == 32:
-            return struct.unpack_from("<i", self._data, offset)[0]
+            return struct.unpack_from("<f", self._data, offset)[0]
         elif self._element_bits == 16:
-            return struct.unpack_from("<h", self._data, offset)[0]
+            # F16 or BF16
+            raw = struct.unpack_from("<H", self._data, offset)[0]
+            if self._dtype in ("F16", ""):
+                return struct.unpack_from("<e", self._data, offset)[0]
+            return raw  # return raw uint16 for BF16 or unknown
         elif self._element_bits == 8:
+            if self._dtype in ("U8", "U1_PACKED"):
+                return struct.unpack_from("<B", self._data, offset)[0]
             return struct.unpack_from("<b", self._data, offset)[0]
         else:
             raise ValueError(f"unsupported element_bits: {self._element_bits}")
 
-    def __getitem__(self, key) -> int:
+    def flat(self, idx: int):
+        """Access element by flat index."""
+        return self._read_element(self._flat_offset(idx))
+
+    def __getitem__(self, key):
         if isinstance(key, tuple):
-            row, col = key
-            return self._read_element(self._offset(row, col))
+            if len(key) != self._ndim:
+                raise IndexError(f"expected {self._ndim} indices, got {len(key)}")
+            flat = 0
+            stride = 1
+            for i in range(self._ndim - 1, -1, -1):
+                flat += key[i] * stride
+                stride *= self._shape[i]
+            return self._read_element(self._flat_offset(flat))
         elif isinstance(key, int):
-            row = key
-            return _GoldenRow(self, row)
+            if self._ndim == 1:
+                return self._read_element(self._flat_offset(key))
+            # Return a row accessor for 2D+
+            return _GoldenSlice(self, key)
         else:
             raise TypeError(f"unsupported key type: {type(key)}")
 
@@ -103,19 +146,24 @@ class GoldenTensor:
         return self._data
 
     def to_list(self) -> list:
-        return [
-            [self._read_element(self._offset(r, c)) for c in range(self._cols)]
-            for r in range(self._rows)
-        ]
+        n = self.element_count()
+        return [self._read_element(self._flat_offset(i)) for i in range(n)]
 
 
-class _GoldenRow:
-    def __init__(self, tensor: GoldenTensor, row: int):
+class _GoldenSlice:
+    """Accessor for a sub-slice when indexing into a multi-dimensional tensor."""
+
+    def __init__(self, tensor: GoldenTensor, index: int):
         self._tensor = tensor
-        self._row = row
+        self._index = index
 
-    def __getitem__(self, col: int) -> int:
-        return self._tensor._read_element(self._tensor._offset(self._row, col))
+    def __getitem__(self, key):
+        # Build a full index tuple
+        if isinstance(key, tuple):
+            return self._tensor[(self._index, *key)]
+        return self._tensor[(self._index, key)]
 
     def __len__(self) -> int:
-        return self._tensor._cols
+        if self._tensor.ndim <= 1:
+            return 0
+        return self._tensor.shape[1]

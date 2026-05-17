@@ -2,6 +2,7 @@
   "id": "smoothquant_m128_k2048",
   "op": "smoothquant",
   "level": "primitive",
+  "op_ref": "ops/vector/smoothquant.yaml",
   "tensors": {
     "golden_smoothquant_input": {
       "path": "golden_smoothquant_input.bin",
@@ -42,6 +43,14 @@
   "attributes": {
     "m": 128,
     "k": 2048
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_smoothquant_input",
+      "golden_smoothquant_output_i8",
+      "golden_smoothquant_scale"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

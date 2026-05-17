@@ -2,6 +2,7 @@
   "id": "silu_m128_n128",
   "op": "silu",
   "level": "primitive",
+  "op_ref": "ops/vector/silu.yaml",
   "tensors": {
     "golden_silu_input_x": {
       "path": "golden_silu_input_x.bin",
@@ -31,6 +32,13 @@
   "attributes": {
     "m": 128,
     "n": 128
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_silu_input_x",
+      "golden_silu_golden_y"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

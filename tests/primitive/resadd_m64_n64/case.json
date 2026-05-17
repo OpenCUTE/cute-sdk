@@ -1,0 +1,9 @@
+{
+  "id": "resadd_m64_n64",
+  "op_ref": "ops/vector/resadd.yaml",
+  "level": "primitive",
+  "golden": "../../golden/manual/vector/resadd_m64_n64/manifest.json",
+  "verify": {
+    "mode": "bit_exact"
+  }
+}

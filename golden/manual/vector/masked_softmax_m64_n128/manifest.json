@@ -2,6 +2,7 @@
   "id": "masked_softmax_m64_n128",
   "op": "masked_softmax",
   "level": "primitive",
+  "op_ref": "ops/vector/masked_softmax.yaml",
   "tensors": {
     "golden_softmax_input": {
       "path": "golden_softmax_input.bin",
@@ -42,6 +43,14 @@
   "attributes": {
     "m": 64,
     "n": 128
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_softmax_input",
+      "golden_softmax_causal_mask",
+      "golden_softmax_output_f16"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

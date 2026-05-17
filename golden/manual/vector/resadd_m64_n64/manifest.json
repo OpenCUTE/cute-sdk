@@ -2,6 +2,7 @@
   "id": "resadd_m64_n64",
   "op": "resadd",
   "level": "primitive",
+  "op_ref": "ops/vector/resadd.yaml",
   "tensors": {
     "golden_resadd_lhs": {
       "path": "golden_resadd_lhs.bin",
@@ -43,6 +44,14 @@
   "attributes": {
     "m": 64,
     "n": 64
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_resadd_lhs",
+      "golden_resadd_rhs",
+      "golden_resadd_output"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

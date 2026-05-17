@@ -1,0 +1,9 @@
+{
+  "id": "rmsnorm_scale_batch1_seq_len128_hidden_dim2048",
+  "op_ref": "ops/vector/rmsnorm_scale.yaml",
+  "level": "primitive",
+  "golden": "../../golden/manual/vector/rmsnorm_scale_batch1_seq_len128_hidden_dim2048/manifest.json",
+  "verify": {
+    "mode": "bit_exact"
+  }
+}

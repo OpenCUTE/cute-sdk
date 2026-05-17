@@ -2,6 +2,7 @@
   "id": "dequant_f16_m64_n64",
   "op": "dequant_f16",
   "level": "primitive",
+  "op_ref": "ops/vector/dequant_f16.yaml",
   "tensors": {
     "golden_dequant_input_i32": {
       "path": "golden_dequant_input_i32.bin",
@@ -53,6 +54,15 @@
   "attributes": {
     "m": 64,
     "n": 64
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_dequant_input_i32",
+      "golden_dequant_input_scale",
+      "golden_dequant_weight_scale",
+      "golden_dequant_output_f16"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",

@@ -190,9 +190,14 @@ def write_manifest(case_dir, case_id, case_name, params, tensors, h_filename):
         "id": case_id,
         "op": case_name,
         "level": "primitive",
+        "op_ref": f"ops/vector/{case_name}.yaml",
         "tensors": tensors,
         "attributes": {k.replace("GOLDEN_", "").lower(): v for k, v in params.items()
                        if not k.startswith("DEQUANT") and not k.startswith("RMSNORM")},
+        "verify": {
+            "mode": "bit_exact",
+            "tensors": [name for name in tensors if "golden" in name.lower() or "output" in name.lower()],
+        },
         "generator": {
             "tool": "rvv_qemu",
             "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
@@ -211,6 +216,25 @@ def write_manifest(case_dir, case_id, case_name, params, tensors, h_filename):
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     return manifest_path
+
+
+def write_test_case(case_id, case_name, golden_manifest_rel):
+    """Create tests/primitive/<case_id>/case.json referencing the golden manifest."""
+    test_dir = SDK_ROOT / "tests" / "primitive" / case_id
+    test_dir.mkdir(parents=True, exist_ok=True)
+    case = {
+        "id": case_id,
+        "op_ref": f"ops/vector/{case_name}.yaml",
+        "level": "primitive",
+        "golden": str(golden_manifest_rel),
+        "verify": {
+            "mode": "bit_exact",
+        },
+    }
+    case_path = test_dir / "case.json"
+    with open(case_path, "w") as f:
+        json.dump(case, f, indent=2)
+    return case_path
 
 
 # ---------------------------------------------------------------------------
@@ -263,6 +287,11 @@ def run_case(qemu, qemu_cpu, binary, case_dir, case_id, case_name, params):
     # Write manifest.json
     manifest_path = write_manifest(case_dir, case_id, case_name, params, tensor_meta, h_filename)
     print(f"    manifest.json")
+
+    # Write tests/primitive/<case_id>/case.json
+    golden_rel = Path("..") / ".." / manifest_path.relative_to(SDK_ROOT)
+    test_case_path = write_test_case(case_id, case_name, golden_rel)
+    print(f"    test -> {test_case_path.relative_to(SDK_ROOT)}")
 
 
 def build_case(cfg, case_name):

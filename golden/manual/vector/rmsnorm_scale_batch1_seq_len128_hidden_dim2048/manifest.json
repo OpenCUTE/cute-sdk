@@ -2,6 +2,7 @@
   "id": "rmsnorm_scale_batch1_seq_len128_hidden_dim2048",
   "op": "rmsnorm_scale",
   "level": "primitive",
+  "op_ref": "ops/vector/rmsnorm_scale.yaml",
   "tensors": {
     "golden_rmsnorm_input": {
       "path": "golden_rmsnorm_input.bin",
@@ -57,6 +58,15 @@
     "batch": 1,
     "seq_len": 128,
     "hidden_dim": 2048
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_rmsnorm_input",
+      "golden_rmsnorm_weight",
+      "golden_rmsnorm_output",
+      "golden_rmsnorm_per_token_scale"
+    ]
   },
   "generator": {
     "tool": "rvv_qemu",
