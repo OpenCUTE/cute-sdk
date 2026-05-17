@@ -20,5 +20,6 @@ int main(void)
                                  GOLDEN_SOFTMAX_M,
                                  GOLDEN_SOFTMAX_N);
 
+    cute_test_host_verify_barrier();
     return 0;
 }

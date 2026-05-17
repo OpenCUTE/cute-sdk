@@ -18,5 +18,6 @@ int main(void)
                        GOLDEN_ROPE_M,
                        GOLDEN_ROPE_HEAD_DIM);
 
+    cute_test_host_verify_barrier();
     return 0;
 }

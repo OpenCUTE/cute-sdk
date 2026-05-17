@@ -7,6 +7,11 @@
 #define CUTE_TEST_ALIGN __attribute__((aligned(64)))
 #define CUTE_TEST_BLOCK 64
 
+static inline void cute_test_host_verify_barrier(void)
+{
+    __asm__ volatile ("fence rw, rw" ::: "memory");
+}
+
 static inline int cute_check_bytes(const void *actual, const void *expected, size_t bytes)
 {
     return memcmp(actual, expected, bytes) == 0 ? 0 : 1;

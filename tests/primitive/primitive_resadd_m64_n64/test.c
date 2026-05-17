@@ -17,5 +17,6 @@ int main(void)
                      GOLDEN_RESADD_M,
                      GOLDEN_RESADD_N);
 
+    cute_test_host_verify_barrier();
     return 0;
 }

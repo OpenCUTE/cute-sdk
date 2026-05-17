@@ -17,5 +17,6 @@ int main(void)
                                  GOLDEN_DEQUANT_M,
                                  GOLDEN_DEQUANT_N);
 
+    cute_test_host_verify_barrier();
     return 0;
 }

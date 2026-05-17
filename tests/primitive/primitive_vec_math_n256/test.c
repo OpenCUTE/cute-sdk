@@ -20,5 +20,6 @@ int main(void)
         __riscv_vse32_v_f32m4(&out_cos[i], cute_vec_cos(x, vl), vl);
     }
 
+    cute_test_host_verify_barrier();
     return 0;
 }

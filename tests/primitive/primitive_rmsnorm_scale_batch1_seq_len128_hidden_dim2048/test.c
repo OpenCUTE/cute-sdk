@@ -18,5 +18,6 @@ int main(void)
                             GOLDEN_RMSNORM_SEQ_LEN,
                             GOLDEN_RMSNORM_HIDDEN_DIM);
 
+    cute_test_host_verify_barrier();
     return 0;
 }

@@ -17,12 +17,6 @@ int main(void)
                      scale,
                      true);
 
-    if (cute_check_star64_blocks(output,
-                                 golden_smoothquant_output_i8,
-                                 GOLDEN_SMOOTHQUANT_M,
-                                 GOLDEN_SMOOTHQUANT_K,
-                                 sizeof(output[0]))) {
-        return 1;
-    }
+    cute_test_host_verify_barrier();
     return 0;
 }

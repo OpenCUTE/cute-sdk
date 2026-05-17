@@ -14,5 +14,6 @@ int main(void)
                    GOLDEN_SILU_M,
                    GOLDEN_SILU_N);
 
+    cute_test_host_verify_barrier();
     return 0;
 }
