@@ -1,0 +1,69 @@
+{
+  "id": "dequant_f16_m64_n64",
+  "op": "dequant_f16",
+  "level": "primitive",
+  "tensors": {
+    "golden_dequant_input_i32": {
+      "path": "golden_dequant_input_i32.bin",
+      "dtype": "I32",
+      "element_bits": 32,
+      "total_bytes": 16384,
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 256
+    },
+    "golden_dequant_input_scale": {
+      "path": "golden_dequant_input_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 256,
+      "layout": "row_major",
+      "shape": [
+        64
+      ],
+      "stride_bytes": 256
+    },
+    "golden_dequant_weight_scale": {
+      "path": "golden_dequant_weight_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 4,
+      "layout": "row_major",
+      "shape": [
+        1
+      ],
+      "stride_bytes": 4
+    },
+    "golden_dequant_output_f16": {
+      "path": "golden_dequant_output_f16.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 8192,
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 128
+    }
+  },
+  "attributes": {
+    "m": 64,
+    "n": 64
+  },
+  "generator": {
+    "tool": "rvv_qemu",
+    "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
+    "qemu": "cuteqemu/build/qemu-riscv64",
+    "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
+    "compiler": "riscv64-unknown-elf-gcc",
+    "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
+    "created": "2026-05-17"
+  },
+  "files": {
+    "header": "golden_dequant_f16.h"
+  }
+}

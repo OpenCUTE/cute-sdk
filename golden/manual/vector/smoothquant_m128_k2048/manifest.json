@@ -1,0 +1,58 @@
+{
+  "id": "smoothquant_m128_k2048",
+  "op": "smoothquant",
+  "level": "primitive",
+  "tensors": {
+    "golden_smoothquant_input": {
+      "path": "golden_smoothquant_input.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1048576,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 8192
+    },
+    "golden_smoothquant_output_i8": {
+      "path": "golden_smoothquant_output_i8.bin",
+      "dtype": "I8",
+      "element_bits": 8,
+      "total_bytes": 262144,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 2048
+    },
+    "golden_smoothquant_scale": {
+      "path": "golden_smoothquant_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 512,
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 512
+    }
+  },
+  "attributes": {
+    "m": 128,
+    "k": 2048
+  },
+  "generator": {
+    "tool": "rvv_qemu",
+    "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
+    "qemu": "cuteqemu/build/qemu-riscv64",
+    "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
+    "compiler": "riscv64-unknown-elf-gcc",
+    "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
+    "created": "2026-05-17"
+  },
+  "files": {
+    "header": "golden_smoothquant.h"
+  }
+}

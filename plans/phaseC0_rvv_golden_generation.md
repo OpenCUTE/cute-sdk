@@ -405,3 +405,42 @@ Phase C1。
 3. F32/I32/I8/F16 storage 的 `.bin` 都可被 reader 读取或 raw-byte 比较。
 4. C0 primitive 测试只验证单算子，不夹带 matmul/fusion/pipeline。
 5. C1 fusion 可以复用 C0 的 primitive golden 组合出更复杂 case。
+
+---
+
+## Implementation details
+
+### Manifest generation strategy
+
+manifest.json 由 `build.py` 在 host 侧生成，C binary 只负责 dump `.bin` 文件。C binary
+通过 stdout 输出 tensor 元数据（name, dtype, shape），build.py 据此组装 JSON。
+
+### QEMU VLEN 锁定
+
+QEMU 命令使用 `-cpu rv64,v=true,vlen=512`，确保 VLEN 不变。
+
+### nvwa_gloden_opt.h 清理范围
+
+从 `gloden_opt.h` 保留：
+- `__gloden_vec_exp`, `__gloden_vec_sin`, `__gloden_vec_cos`, `__gloden_vec_sin_small`, `__gloden_vec_tanh`
+- `__gloden_silu`, `__gloden_rope`, `__gloden_softmax`
+- `__gloden_smoothquantO1`, `__gloden_smoothquantO1_stage1_getscale`, `__gloden_smoothquantO1_stage2_quant`
+- `__gloden_cvrtfp16`, `__gloden_RMSnorm`
+- `fast_sqrt`
+
+移除：`__gloden_f16_matmul`, `__gloden_GeLu`, `__gloden_Q_matmul_I8I8I32`, `__gloden_pertoken_pertensor_scale`, `check_diff_*`
+
+### nvwa_llama_primitives.h 拆分
+
+从 `llama3_1B_cpu.c` 拆出纯函数，去掉 fusion glue：
+
+- `__gloden_dequant_i32_to_f32(input_i32, input_scale, weight_scale, M, N)`
+- `__gloden_resadd_f32(lhs, rhs, M, N)`
+- `__gloden_hadamard_f32(lhs, rhs, row_absmax_out, M, N)` — 补全 NVWA 中被注释的 absmax 计算
+- `__gloden_RMSnorm_with_getabsmax_scale(...)` — 来自 llama3_1B_cpu.c:1067
+
+### GoldenTensor reader 升级要点
+
+- 支持 F32 (`<f`), F16 (`<e`), BF16, U8, I8, U1_PACKED
+- 支持 1D/2D/3D shape
+- 当 `total_bytes` 存在时优先使用

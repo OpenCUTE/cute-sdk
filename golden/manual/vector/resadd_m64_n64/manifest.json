@@ -1,0 +1,59 @@
+{
+  "id": "resadd_m64_n64",
+  "op": "resadd",
+  "level": "primitive",
+  "tensors": {
+    "golden_resadd_lhs": {
+      "path": "golden_resadd_lhs.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 16384,
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 256
+    },
+    "golden_resadd_rhs": {
+      "path": "golden_resadd_rhs.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 16384,
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 256
+    },
+    "golden_resadd_output": {
+      "path": "golden_resadd_output.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 16384,
+      "layout": "row_major",
+      "shape": [
+        64,
+        64
+      ],
+      "stride_bytes": 256
+    }
+  },
+  "attributes": {
+    "m": 64,
+    "n": 64
+  },
+  "generator": {
+    "tool": "rvv_qemu",
+    "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
+    "qemu": "cuteqemu/build/qemu-riscv64",
+    "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
+    "compiler": "riscv64-unknown-elf-gcc",
+    "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
+    "created": "2026-05-17"
+  },
+  "files": {
+    "header": "golden_resadd.h"
+  }
+}

@@ -1,0 +1,90 @@
+# RVV golden generator case definitions.
+# build.py reads this file and passes params as -D flags to the compiler.
+
+toolchain:
+  cc: ../tool/riscv/bin/riscv64-unknown-elf-gcc
+  cflags: "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d"
+  qemu: cuteqemu/build/qemu-riscv64
+  qemu_cpu: "rv64,v=true,vlen=512,zvfh=true"
+
+cases:
+  - name: silu
+    source: gen_silu.c
+    params:
+      GOLDEN_M: 128
+      GOLDEN_N: 128
+
+  - name: vec_math
+    source: gen_vec_math.c
+    params:
+      GOLDEN_N: 256
+
+  - name: dequant_f32
+    source: gen_dequant.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      DEQUANT_OUTPUT_F32: 1
+
+  - name: dequant_f16
+    source: gen_dequant.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      DEQUANT_OUTPUT_F16: 1
+
+  - name: resadd
+    source: gen_resadd.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+
+  - name: hadamard
+    source: gen_hadamard.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 128
+
+  - name: rope_pos0
+    source: gen_rope.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_HEAD_DIM: 64
+      GOLDEN_N_HEAD: 1
+      ROPE_POS: 0
+
+  - name: rope_pos17
+    source: gen_rope.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_HEAD_DIM: 64
+      GOLDEN_N_HEAD: 1
+      ROPE_POS: 17
+
+  - name: masked_softmax
+    source: gen_masked_softmax.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 128
+
+  - name: smoothquant
+    source: gen_smoothquant.c
+    params:
+      GOLDEN_M: 128
+      GOLDEN_K: 2048
+
+  - name: rmsnorm
+    source: gen_rmsnorm.c
+    params:
+      GOLDEN_BATCH: 1
+      GOLDEN_SEQ_LEN: 128
+      GOLDEN_HIDDEN_DIM: 2048
+      RMSNORM_PLAIN: 1
+
+  - name: rmsnorm_scale
+    source: gen_rmsnorm.c
+    params:
+      GOLDEN_BATCH: 1
+      GOLDEN_SEQ_LEN: 128
+      GOLDEN_HIDDEN_DIM: 2048
+      RMSNORM_WITH_SCALE: 1

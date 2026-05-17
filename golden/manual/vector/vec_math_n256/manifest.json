@@ -1,0 +1,66 @@
+{
+  "id": "vec_math_n256",
+  "op": "vec_math",
+  "level": "primitive",
+  "tensors": {
+    "golden_vec_math_input_x": {
+      "path": "golden_vec_math_input_x.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1024,
+      "layout": "row_major",
+      "shape": [
+        256
+      ],
+      "stride_bytes": 1024
+    },
+    "golden_vec_math_exp": {
+      "path": "golden_vec_math_exp.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1024,
+      "layout": "row_major",
+      "shape": [
+        256
+      ],
+      "stride_bytes": 1024
+    },
+    "golden_vec_math_sin": {
+      "path": "golden_vec_math_sin.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1024,
+      "layout": "row_major",
+      "shape": [
+        256
+      ],
+      "stride_bytes": 1024
+    },
+    "golden_vec_math_cos": {
+      "path": "golden_vec_math_cos.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1024,
+      "layout": "row_major",
+      "shape": [
+        256
+      ],
+      "stride_bytes": 1024
+    }
+  },
+  "attributes": {
+    "n": 256
+  },
+  "generator": {
+    "tool": "rvv_qemu",
+    "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
+    "qemu": "cuteqemu/build/qemu-riscv64",
+    "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
+    "compiler": "riscv64-unknown-elf-gcc",
+    "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
+    "created": "2026-05-17"
+  },
+  "files": {
+    "header": "golden_vec_math.h"
+  }
+}
