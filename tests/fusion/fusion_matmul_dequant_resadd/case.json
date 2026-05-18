@@ -32,7 +32,7 @@
       {
         "tensor": "golden_output",
         "symbol": "output",
-        "float_tolerance_percent": 0.1
+        "float_tolerance_percent": 0.05
       }
     ]
   }

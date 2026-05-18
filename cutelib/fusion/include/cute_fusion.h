@@ -18,6 +18,14 @@ static inline const void *cute_fusion_tile_ptr_const(const void *base,
 
 static inline void cute_post_dequant_rope_bf16cvt(const cute_post_call_t *call)
 {
+    const cute_rope_ctx_t *base_ctx =
+        (const cute_rope_ctx_t *)call->user_ctx;
+    cute_rope_ctx_t tile_ctx = {
+        .pos = base_ctx->pos + call->tile.row0,
+        .rope_theta = base_ctx->rope_theta,
+        .key_dim = base_ctx->key_dim,
+    };
+
     cute_fuse_dequant_rope_bf16cvt_tile(
         (const int32_t *)call->tile.src,
         call->tile.src_stride,
@@ -27,7 +35,7 @@ static inline void cute_post_dequant_rope_bf16cvt(const cute_post_call_t *call)
         call->env.b_scale,
         call->tile.rows,
         call->tile.cols,
-        (const cute_rope_ctx_t *)call->user_ctx);
+        &tile_ctx);
 }
 
 static inline void cute_post_dequant_bf16cvt(const cute_post_call_t *call)
