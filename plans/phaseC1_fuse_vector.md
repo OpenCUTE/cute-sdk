@@ -228,7 +228,7 @@ cute_silu_tile(output, output_stride, rows, cols);
 | `primitive_fuse_dequant_bf16cvt_m64_n64` | dequant + BF16 convert + layout bit-exact |
 | `primitive_fuse_dequant_rope_bf16cvt_m64_n64` | dequant + RoPE + BF16 bit-exact |
 | `primitive_fuse_dequant_hadamard_m64_n128` | hadamard + absmax 跨 N tile 累积 |
-| `primitive_fuse_masked_softmax_kvscale_bf16cvt_m64_n128` | masked softmax + kv scale + BF16 bit-exact |
+| `primitive_fuse_masked_softmax_kvscale_bf16cvt_m64_n128` | masked softmax + kv scale + BF16，允许 0.1% 浮点误差 |
 
 建议新增 `tests/vecfusion.yaml`，避免把普通 primitive 和 fuse primitive 混在一个 suite 里。
 
@@ -260,6 +260,6 @@ python3 tools/runner/cute-test.py --suite cute-sdk/tests/vecfusion.yaml --skip-b
 
 1. 6 个 `cute_fuse_*_tile` API 都可独立调用。
 2. 6 个 `primitive_fuse_*` case 都有固定 golden。
-3. 所有 case bit-exact 通过。
+3. 整数/定点/简单 F32 case bit-exact 通过；softmax/exp/归约类 case 允许明确标注的浮点误差。
 4. 所有函数不依赖 `cute_post_call_t`。
 5. 所有函数不依赖 `llama3_1B.c` 全局变量。

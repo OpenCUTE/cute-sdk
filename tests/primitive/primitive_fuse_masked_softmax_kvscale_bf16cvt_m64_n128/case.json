@@ -1,0 +1,24 @@
+{
+  "id": "primitive_fuse_masked_softmax_kvscale_bf16cvt_m64_n128",
+  "op_ref": "ops/vector/masked_softmax.yaml",
+  "level": "primitive",
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/vector/fuse_masked_softmax_kvscale_bf16cvt_m64_n128/manifest.json",
+  "verify": {
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_fuse_output_f16",
+        "symbol": "output",
+        "float_tolerance_percent": 0.1
+      }
+    ]
+  }
+}

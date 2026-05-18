@@ -45,7 +45,7 @@ def resolve_tool(cfg, key):
 def make_case_id(name, params):
     id_parts = [name]
     for k, v in params.items():
-        if k.startswith("DEQUANT") or k.startswith("RMSNORM") or k == "ROPE_POS":
+        if k.startswith("DEQUANT") or k.startswith("RMSNORM") or k.startswith("FUSE") or k == "ROPE_POS":
             continue
         dim = k.replace("GOLDEN_", "").lower()
         id_parts.append(f"{dim}{v}")

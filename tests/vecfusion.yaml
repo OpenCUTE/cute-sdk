@@ -1,0 +1,10 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 6
+cases:
+  - primitive_fuse_dequant_silu_m64_n64
+  - primitive_fuse_dequant_resadd_m64_n64
+  - primitive_fuse_dequant_bf16cvt_m64_n64
+  - primitive_fuse_dequant_rope_bf16cvt_m64_n64
+  - primitive_fuse_dequant_hadamard_m64_n128
+  - primitive_fuse_masked_softmax_kvscale_bf16cvt_m64_n128

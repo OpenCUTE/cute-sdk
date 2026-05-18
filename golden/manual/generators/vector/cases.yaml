@@ -33,6 +33,50 @@ cases:
       GOLDEN_N: 64
       DEQUANT_OUTPUT_F16: 1
 
+  - name: fuse_dequant_silu
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      FUSE_DEQUANT_SILU: 1
+
+  - name: fuse_dequant_resadd
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      FUSE_DEQUANT_RESADD: 1
+
+  - name: fuse_dequant_bf16cvt
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      FUSE_DEQUANT_BF16CVT: 1
+
+  - name: fuse_dequant_rope_bf16cvt
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 64
+      FUSE_DEQUANT_ROPE_BF16CVT: 1
+      FUSE_ROPE_POS: 17
+
+  - name: fuse_dequant_hadamard
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 128
+      FUSE_DEQUANT_HADAMARD: 1
+
+  - name: fuse_masked_softmax_kvscale_bf16cvt
+    source: gen_fuse_vector.c
+    params:
+      GOLDEN_M: 64
+      GOLDEN_N: 128
+      FUSE_MASKED_SOFTMAX_KVSCALE_BF16CVT: 1
+      FUSE_KVSCALE: 0.3535533905932738
+
   - name: resadd
     source: gen_resadd.c
     params:

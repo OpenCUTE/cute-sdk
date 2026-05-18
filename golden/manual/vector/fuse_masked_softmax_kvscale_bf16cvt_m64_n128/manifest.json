@@ -1,0 +1,69 @@
+{
+  "id": "fuse_masked_softmax_kvscale_bf16cvt_m64_n128",
+  "op": "fuse_masked_softmax_kvscale_bf16cvt",
+  "level": "primitive",
+  "op_ref": "ops/vector/fuse_masked_softmax_kvscale_bf16cvt.yaml",
+  "tensors": {
+    "golden_fuse_input": {
+      "path": "golden_fuse_input.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 32768,
+      "layout": "row_major",
+      "shape": [
+        64,
+        128
+      ],
+      "stride_bytes": 512
+    },
+    "golden_fuse_causal_mask": {
+      "path": "golden_fuse_causal_mask.bin",
+      "dtype": "U1_PACKED",
+      "element_bits": 8,
+      "total_bytes": 1024,
+      "layout": "row_major",
+      "shape": [
+        1024
+      ],
+      "stride_bytes": 1024
+    },
+    "golden_fuse_output_f16": {
+      "path": "golden_fuse_output_f16.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 16384,
+      "layout": "row_major",
+      "shape": [
+        64,
+        128
+      ],
+      "stride_bytes": 256
+    }
+  },
+  "attributes": {
+    "m": 64,
+    "n": 128,
+    "fuse_masked_softmax_kvscale_bf16cvt": 1,
+    "fuse_kvscale": 0.3535533905932738
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensors": [
+      "golden_fuse_input",
+      "golden_fuse_causal_mask",
+      "golden_fuse_output_f16"
+    ]
+  },
+  "generator": {
+    "tool": "rvv_qemu",
+    "source": "NVWA/llama3.2_1B/data_flow/gloden_opt.h",
+    "qemu": "cuteqemu/build/qemu-riscv64",
+    "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
+    "compiler": "riscv64-unknown-elf-gcc",
+    "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
+    "created": "2026-05-18"
+  },
+  "files": {
+    "header": "golden_fuse_masked_softmax_kvscale_bf16cvt.h"
+  }
+}
