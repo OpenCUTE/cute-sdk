@@ -62,6 +62,15 @@ target_include_directories(cutelib_primitive INTERFACE
 target_link_libraries(cutelib_primitive INTERFACE cutelib_runtime)
 
 # ============================================================
+# L3: cutelib/fusion — tensor tile_op + vector primitive adapters
+# ============================================================
+add_library(cutelib_fusion INTERFACE)
+target_include_directories(cutelib_fusion INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/fusion/include
+)
+target_link_libraries(cutelib_fusion INTERFACE cutelib_tensor cutelib_primitive)
+
+# ============================================================
 # Tests
 # ============================================================
 
@@ -163,3 +172,44 @@ add_primitive_test(primitive_masked_softmax_m64_n128)
 add_primitive_test(primitive_smoothquant_m128_k2048)
 add_primitive_test(primitive_rmsnorm_batch1_seq_len128_hidden_dim2048)
 add_primitive_test(primitive_rmsnorm_scale_batch1_seq_len128_hidden_dim2048)
+
+# ============================================================
+# Fusion tests
+# ============================================================
+
+function(add_fusion_test_variant case_dir variant source)
+    set(case_name ${case_dir}_${variant})
+    set(test_src ${CMAKE_CURRENT_SOURCE_DIR}/tests/fusion/${case_dir}/${source})
+    set(data_dir ${CMAKE_CURRENT_SOURCE_DIR}/tests/fusion/${case_dir})
+
+    if(NOT EXISTS ${test_src})
+        message(WARNING "Skipping ${case_name}: ${source} not found")
+        return()
+    endif()
+
+    add_executable(${case_name} ${test_src})
+    target_include_directories(${case_name} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/fusion
+        ${data_dir}
+    )
+    target_link_libraries(${case_name} PRIVATE
+        cutelib_fusion
+        cute_riscv_vector_baremetal_options
+        m
+    )
+    set_target_properties(${case_name} PROPERTIES
+        SUFFIX .riscv
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/fusion
+    )
+endfunction()
+
+add_fusion_test_variant(fusion_matmul_dequant_silu notile test_notile.c)
+add_fusion_test_variant(fusion_matmul_dequant_silu nopipeline test_nopipeline.c)
+add_fusion_test_variant(fusion_matmul_dequant_silu pipeline test_pipeline.c)
+add_fusion_test_variant(fusion_matmul_dequant_resadd notile test_notile.c)
+add_fusion_test_variant(fusion_matmul_dequant_resadd nopipeline test_nopipeline.c)
+add_fusion_test_variant(fusion_matmul_dequant_resadd pipeline test_pipeline.c)
+add_fusion_test_variant(fusion_matmul_dequant_bf16cvt notile test_notile.c)
+add_fusion_test_variant(fusion_matmul_dequant_bf16cvt nopipeline test_nopipeline.c)
+add_fusion_test_variant(fusion_matmul_dequant_bf16cvt pipeline test_pipeline.c)

@@ -113,11 +113,12 @@ static inline void cute_run_post_op(
 }
 
 /* ---- Tiled Matmul without post-op pipeline ---- */
-static inline void cute_tiled_matmul_no_pipeline(
+static inline void cute_tiled_matmul_no_pipeline_ex(
     const cute_tensor_t *a,
     const cute_tensor_t *b,
     void *output,
     uint64_t output_stride,
+    uint64_t output_elem_bytes,
     const cute_tensor_t *bias,
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
@@ -130,13 +131,15 @@ static inline void cute_tiled_matmul_no_pipeline(
     int tile_j = N / CUTE_TILE_N;
     int total = tile_i * tile_j;
     uint64_t tile_out_stride = CUTE_TILE_N * 4;
+    uint64_t output_tile_elem_bytes = post_op == NULL ? 4 : output_elem_bytes;
 
     if (total == 0)
         return;
 
     /* helper: compute tile output pointer */
     #define _TILE_OUT_PTR(ti, tj) \
-        ((char *)output + (ti) * CUTE_TILE_M * output_stride + (tj) * CUTE_TILE_N * 4)
+        ((char *)output + (ti) * CUTE_TILE_M * output_stride + \
+         (tj) * CUTE_TILE_N * output_tile_elem_bytes)
 
     /* helper: compute tile A data pointer */
     #define _TILE_A_PTR(ti) \
@@ -224,12 +227,31 @@ static inline void cute_tiled_matmul_no_pipeline(
     #undef _TILE_B_PTR
 }
 
-/* ---- Tiled Matmul with two-buffer post-op pipeline ---- */
-static inline void cute_tiled_matmul_pipeline(
+static inline void cute_tiled_matmul_no_pipeline(
     const cute_tensor_t *a,
     const cute_tensor_t *b,
     void *output,
     uint64_t output_stride,
+    const cute_tensor_t *bias,
+    float *a_scale, float *b_scale,
+    int scale_type, int bias_mode, int transpose,
+    void *double_buf,
+    cute_post_op_fn post_op,
+    void *post_ctx)
+{
+    cute_tiled_matmul_no_pipeline_ex(a, b, output, output_stride, 4,
+                                     bias, a_scale, b_scale, scale_type,
+                                     bias_mode, transpose, double_buf,
+                                     post_op, post_ctx);
+}
+
+/* ---- Tiled Matmul with two-buffer post-op pipeline ---- */
+static inline void cute_tiled_matmul_pipeline_ex(
+    const cute_tensor_t *a,
+    const cute_tensor_t *b,
+    void *output,
+    uint64_t output_stride,
+    uint64_t output_elem_bytes,
     const cute_tensor_t *bias,
     float *a_scale, float *b_scale,
     int scale_type, int bias_mode, int transpose,
@@ -242,13 +264,15 @@ static inline void cute_tiled_matmul_pipeline(
     int tile_j = N / CUTE_TILE_N;
     int total = tile_i * tile_j;
     uint64_t tile_out_stride = CUTE_TILE_N * 4;
+    uint64_t output_tile_elem_bytes = output_elem_bytes;
     void *bufs[2] = {double_buf0, double_buf1};
 
     if (post_op == NULL || double_buf0 == NULL || double_buf1 == NULL) {
-        cute_tiled_matmul_no_pipeline(a, b, output, output_stride, bias,
-                                      a_scale, b_scale, scale_type,
-                                      bias_mode, transpose,
-                                      double_buf0, post_op, post_ctx);
+        cute_tiled_matmul_no_pipeline_ex(a, b, output, output_stride,
+                                         output_elem_bytes, bias,
+                                         a_scale, b_scale, scale_type,
+                                         bias_mode, transpose,
+                                         double_buf0, post_op, post_ctx);
         return;
     }
 
@@ -256,7 +280,8 @@ static inline void cute_tiled_matmul_pipeline(
         return;
 
     #define _TILE_OUT_PTR(ti, tj) \
-        ((char *)output + (ti) * CUTE_TILE_M * output_stride + (tj) * CUTE_TILE_N * 4)
+        ((char *)output + (ti) * CUTE_TILE_M * output_stride + \
+         (tj) * CUTE_TILE_N * output_tile_elem_bytes)
 
     #define _TILE_A_PTR(ti) \
         ((char *)a->data + (ti) * CUTE_TILE_M * a->stride)
@@ -306,6 +331,24 @@ static inline void cute_tiled_matmul_pipeline(
     #undef _TILE_OUT_PTR
     #undef _TILE_A_PTR
     #undef _TILE_B_PTR
+}
+
+static inline void cute_tiled_matmul_pipeline(
+    const cute_tensor_t *a,
+    const cute_tensor_t *b,
+    void *output,
+    uint64_t output_stride,
+    const cute_tensor_t *bias,
+    float *a_scale, float *b_scale,
+    int scale_type, int bias_mode, int transpose,
+    void *double_buf0, void *double_buf1,
+    cute_post_op_fn post_op,
+    void *post_ctx)
+{
+    cute_tiled_matmul_pipeline_ex(a, b, output, output_stride, 4,
+                                  bias, a_scale, b_scale, scale_type,
+                                  bias_mode, transpose, double_buf0,
+                                  double_buf1, post_op, post_ctx);
 }
 
 /* Backward-compatible alias for the non-pipelined implementation. */

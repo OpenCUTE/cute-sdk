@@ -1,0 +1,39 @@
+{
+  "id": "fusion_matmul_dequant_bf16cvt",
+  "level": "fusion",
+  "op_ref": "ops/vector/dequant.yaml",
+  "build": {
+    "variants": [
+      {
+        "name": "notile",
+        "source": "test_notile.c",
+        "target": "fusion_matmul_dequant_bf16cvt_notile.riscv"
+      },
+      {
+        "name": "nopipeline",
+        "source": "test_nopipeline.c",
+        "target": "fusion_matmul_dequant_bf16cvt_nopipeline.riscv"
+      },
+      {
+        "name": "pipeline",
+        "source": "test_pipeline.c",
+        "target": "fusion_matmul_dequant_bf16cvt_pipeline.riscv"
+      }
+    ]
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/fusion/matmul_dequant_bf16cvt_m128_n128/manifest.json",
+  "verify": {
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_output",
+        "symbol": "output",
+        "float_tolerance_percent": 0.5
+      }
+    ]
+  }
+}
