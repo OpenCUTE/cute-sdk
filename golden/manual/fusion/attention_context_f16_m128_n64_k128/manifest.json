@@ -1,0 +1,32 @@
+{
+  "id": "attention_context_f16_m128_n64_k128",
+  "op": "attention_context_f16",
+  "level": "fusion",
+  "tensors": {
+    "golden_output": {
+      "path": "golden_output.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 32768,
+      "layout": "row_major",
+      "shape": [
+        128,
+        64
+      ],
+      "stride_bytes": 256
+    }
+  },
+  "attributes": {
+    "m": 128,
+    "n": 64,
+    "k": 128,
+    "input_dtype": "F16F16F32",
+    "scores": "causal lower triangle f16 deterministic values",
+    "value": "f16 deterministic values, B layout [N][K]"
+  },
+  "generator": {
+    "tool": "golden/manual/generators/fusion/gen_matmul_post.py",
+    "source": "golden/manual/tensor/matmul_i8_128_128_128_zeroinit/golden.bin",
+    "created": "2026-05-18"
+  }
+}

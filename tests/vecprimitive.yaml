@@ -12,5 +12,6 @@ cases:
   - primitive_rope_pos17_m64_head_dim64_n_head1
   - primitive_masked_softmax_m64_n128
   - primitive_smoothquant_m128_k2048
+  - primitive_smoothquant_stage2_m128_k2048
   - primitive_rmsnorm_batch1_seq_len128_hidden_dim2048
   - primitive_rmsnorm_scale_batch1_seq_len128_hidden_dim2048

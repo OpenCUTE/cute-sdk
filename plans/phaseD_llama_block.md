@@ -17,6 +17,17 @@
 剩下的重点不是补普通 vector primitive，而是把 LLaMA 真实执行路径里的
 attention / layer 级语义补齐。
 
+当前进度：
+
+- D0 已落地：`primitive_smoothquant_stage2_m128_k2048` 和
+  `fusion_attention_context_f16_m128_n64_k128` 已实现并验证。
+- D1 已落地：新增 row-block full-N helper，`N=128` masked softmax
+  fusion 已实现并验证。
+- LLaMA V layout 前置项已落地：`transpose_result=1` 的
+  dequant+F16/BF16 store 已实现并验证，供 `proj_v` 使用。
+- 剩余主线：D2 真实 shape fusion 回归，D3 `cute_llama_block`
+  layer API 和端到端 case。
+
 ---
 
 ## 1. LLaMA block 算子路径
@@ -106,10 +117,10 @@ attention / layer 级语义补齐。
 tests/primitive/primitive_smoothquant_stage2_m128_k2048/
     case.json
     test.c
-golden/manual/vector/smoothquant_stage2_m128_k2048/
+golden/manual/vector/smoothquant_m128_k2048/
     manifest.json
-    golden_output.bin
-    golden_scale.bin
+    golden_smoothquant_output_i8.bin
+    golden_smoothquant_scale.bin
 ```
 
 测试策略：
@@ -119,7 +130,7 @@ golden/manual/vector/smoothquant_stage2_m128_k2048/
 - 调 `cute_smoothquant(input, M, K, output, scale, false)`。
 - verify:
   - `output`: bit exact
-  - `scale`: 可选，只作为 trace publish 确认未被破坏。
+  - `scale`: 作为输入复用，不在 test 中额外 publish。
 
 ### 4.2 Attention context matmul
 
@@ -234,6 +245,38 @@ golden/manual/fusion/matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64/
 ```bash
 python3 tools/runner/cute-test.py \
   --suite cute-sdk/tests/fusion_attention.yaml \
+  --skip-build
+```
+
+### 5.4 V projection transpose layout
+
+cutetest 中 `proj_v` 使用：
+
+```text
+transpose_result = 1
+output stride = SEQ_LEN * sizeof(F16)
+```
+
+因此 V buffer 是 `[kv_head][value_dim][seq_len]`，作为后续
+`scores x V` 的 CUTE B layout。这里不能复用普通 dequant 的
+row-scale 逻辑；转置输出需要按 tile 内 column 使用 token scale。
+
+新增：
+
+```text
+tests/fusion/fusion_matmul_dequant_bf16cvt_transpose/
+    case.json
+    test_notile.c
+    test_nopipeline.c
+    test_pipeline.c
+tests/fusion_llama_layout.yaml
+```
+
+验证：
+
+```bash
+python3 tools/runner/cute-test.py \
+  --suite cute-sdk/tests/fusion_llama_layout.yaml \
   --skip-build
 ```
 
@@ -465,4 +508,3 @@ ffn_up_scale                      [128] F32
 | RoPE 多 head tile_j 语义出错 | D2 单独做 `N=2048` projection 回归 |
 | FFN 8192 仿真太慢 | 大 shape suite 不进入 smoke，先跑关键 subset |
 | workspace alias 复杂 | D3 第一版显式 buffer，不做复用优化 |
-

@@ -67,6 +67,19 @@ static inline void cute_fuse_dequant_bf16cvt_tile(
                                   rows, cols);
 }
 
+static inline void cute_fuse_dequant_bf16cvt_transpose_tile(
+    const int32_t *input, uint64_t input_stride,
+    void *output, uint64_t output_stride,
+    const float *input_scale,
+    const float *weight_scale,
+    int rows, int cols)
+{
+    cute_dequant_i32_to_bf16_transpose_tile(input, input_stride,
+                                            output, output_stride,
+                                            input_scale, weight_scale,
+                                            rows, cols);
+}
+
 static inline void cute_fuse_masked_softmax_kvscale_bf16cvt_tile(
     const float *input, uint64_t input_stride,
     void *output, uint64_t output_stride,

@@ -1,0 +1,39 @@
+{
+  "id": "fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64",
+  "level": "fusion",
+  "op_ref": "ops/vector/masked_softmax.yaml",
+  "build": {
+    "variants": [
+      {
+        "name": "notile",
+        "source": "test_notile.c",
+        "target": "fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64_notile.riscv"
+      },
+      {
+        "name": "nopipeline",
+        "source": "test_nopipeline.c",
+        "target": "fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64_nopipeline.riscv"
+      },
+      {
+        "name": "pipeline",
+        "source": "test_pipeline.c",
+        "target": "fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64_pipeline.riscv"
+      }
+    ]
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/fusion/matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64/manifest.json",
+  "verify": {
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_output_f16",
+        "symbol": "output",
+        "float_tolerance_percent": 0.5
+      }
+    ]
+  }
+}

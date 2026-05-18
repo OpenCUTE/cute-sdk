@@ -13,6 +13,7 @@ M128 = 128
 N128 = 128
 N64 = 64
 K64 = 64
+K128 = 128
 TENSOR_GOLDEN = Path("golden/manual/tensor/matmul_i8_128_128_128_zeroinit/golden.bin")
 OUT_ROOT = Path("golden/manual/fusion")
 WEIGHT_SCALE = 0.001
@@ -60,6 +61,18 @@ def softmax_a_value(row: int, col: int) -> float:
 def softmax_b_value(row: int, col: int) -> float:
     v = ((row * 7 + col * 11) % 19) - 9
     return f16(v * 0.0625)
+
+
+def attention_score_value(row: int, col: int) -> float:
+    if col > row:
+        return f16(0.0)
+    v = ((row * 3 + col * 5) % 17) + 1
+    return f16(v * 0.00390625)
+
+
+def attention_value_value(row: int, col: int) -> float:
+    v = ((row * 13 + col * 7) % 31) - 15
+    return f16(v * 0.03125)
 
 
 def dequant(acc: int, row: int) -> float:
@@ -274,7 +287,31 @@ def emit_hadamard(case_id: str, output: list[float], row_absmax: list[float]) ->
     )
 
 
-def emit_softmax(case_id: str, output: list[float]) -> None:
+def emit_attention_context(case_id: str, output: list[float]) -> None:
+    case_dir = OUT_ROOT / case_id
+    case_dir.mkdir(parents=True, exist_ok=True)
+    (case_dir / "golden_output.bin").write_bytes(pack_f32(output))
+    write_manifest(
+        case_dir,
+        case_id,
+        {
+            "golden_output": tensor_desc(
+                "golden_output.bin", "F32", 32, [M128, N64], N64 * 4
+            )
+        },
+        {
+            "m": M128,
+            "n": N64,
+            "k": K128,
+            "input_dtype": "F16F16F32",
+            "scores": "causal lower triangle f16 deterministic values",
+            "value": "f16 deterministic values, B layout [N][K]",
+        },
+    )
+
+
+def emit_softmax(case_id: str, output: list[float],
+                 rows: int, cols: int, k: int) -> None:
     case_dir = OUT_ROOT / case_id
     case_dir.mkdir(parents=True, exist_ok=True)
     (case_dir / "golden_output_f16.bin").write_bytes(pack_f16(output))
@@ -283,26 +320,26 @@ def emit_softmax(case_id: str, output: list[float]) -> None:
         case_id,
         {
             "golden_output_f16": tensor_desc(
-                "golden_output_f16.bin", "F16", 16, [M128, N64], N64 * 2
+                "golden_output_f16.bin", "F16", 16, [rows, cols], cols * 2
             )
         },
         {
-            "m": M128,
-            "n": N64,
-            "k": K64,
+            "m": rows,
+            "n": cols,
+            "k": k,
             "kv_scale": 0.125,
-            "mask": "causal, max_ctx_len=64",
+            "mask": f"causal, max_ctx_len={cols}",
             "input_dtype": "F16F16F32",
         },
     )
 
 
-def softmax_scores() -> list[float]:
+def softmax_scores(rows: int, cols: int, kdim: int) -> list[float]:
     scores = []
-    for row in range(M128):
-        for col in range(N64):
+    for row in range(rows):
+        for col in range(cols):
             acc = f32(0.0)
-            for k in range(K64):
+            for k in range(kdim):
                 prod = f32(softmax_a_value(row, k) * softmax_b_value(col, k))
                 acc = f32(acc + prod)
             scores.append(acc)
@@ -325,6 +362,19 @@ def masked_softmax(scores: list[float], rows: int, cols: int, scale: float) -> l
         denom = f32(sum(exps))
         for col in range(cols):
             output[base + col] = f32(exps[col] / denom)
+    return output
+
+
+def attention_context() -> list[float]:
+    output = []
+    for row in range(M128):
+        for col in range(N64):
+            acc = f32(0.0)
+            for k in range(K128):
+                prod = f32(attention_score_value(row, k) *
+                           attention_value_value(col, k))
+                acc = f32(acc + prod)
+            output.append(acc)
     return output
 
 
@@ -352,6 +402,18 @@ def main() -> int:
         32,
     )
     emit_single("matmul_dequant_bf16cvt_m128_n128", deq128, M128, N128, "F16", 16)
+    emit_single(
+        "matmul_dequant_bf16cvt_transpose_m128_n128",
+        [
+            dequant(matmul[col * N128 + row], row=col)
+            for row in range(N128)
+            for col in range(M128)
+        ],
+        N128,
+        M128,
+        "F16",
+        16,
+    )
 
     matmul64 = slice_cols(matmul, M128, N128, N64)
     deq64 = [dequant(acc, row=i // N64) for i, acc in enumerate(matmul64)]
@@ -376,7 +438,21 @@ def main() -> int:
 
     emit_softmax(
         "matmul_masked_softmax_kvscale_bf16cvt_m128_n64_k64",
-        masked_softmax(softmax_scores(), M128, N64, 0.125),
+        masked_softmax(softmax_scores(M128, N64, K64), M128, N64, 0.125),
+        M128,
+        N64,
+        K64,
+    )
+    emit_softmax(
+        "matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64",
+        masked_softmax(softmax_scores(M128, N128, K64), M128, N128, 0.125),
+        M128,
+        N128,
+        K64,
+    )
+    emit_attention_context(
+        "attention_context_f16_m128_n64_k128",
+        attention_context(),
     )
     return 0
 

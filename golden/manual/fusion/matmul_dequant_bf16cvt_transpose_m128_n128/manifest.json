@@ -1,0 +1,31 @@
+{
+  "id": "matmul_dequant_bf16cvt_transpose_m128_n128",
+  "op": "matmul_dequant_bf16cvt_transpose",
+  "level": "fusion",
+  "tensors": {
+    "golden_output": {
+      "path": "golden_output.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 32768,
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 256
+    }
+  },
+  "attributes": {
+    "m": 128,
+    "n": 128,
+    "k": 128,
+    "input_scale": "0.001f + (row % 17) * 0.00001f",
+    "weight_scale": 0.001
+  },
+  "generator": {
+    "tool": "golden/manual/generators/fusion/gen_matmul_post.py",
+    "source": "golden/manual/tensor/matmul_i8_128_128_128_zeroinit/golden.bin",
+    "created": "2026-05-18"
+  }
+}

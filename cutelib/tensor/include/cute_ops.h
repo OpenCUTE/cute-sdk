@@ -77,6 +77,45 @@ typedef struct {
 
 typedef void (*cute_post_op_fn)(const cute_post_call_t *call);
 
+static inline void cute_run_post_op_shape(
+    cute_post_op_fn post_op,
+    void *src,
+    void *dst,
+    uint64_t src_stride,
+    uint64_t dst_stride,
+    int rows,
+    int cols,
+    int tile_i,
+    int tile_j,
+    int row0,
+    int col0,
+    float *a_scale,
+    float *b_scale,
+    int scale_type,
+    int bias_mode,
+    int transpose,
+    void *user_ctx)
+{
+    cute_post_call_t call;
+    call.tile.src = src;
+    call.tile.dst = dst;
+    call.tile.src_stride = src_stride;
+    call.tile.dst_stride = dst_stride;
+    call.tile.rows = rows;
+    call.tile.cols = cols;
+    call.tile.tile_i = tile_i;
+    call.tile.tile_j = tile_j;
+    call.tile.row0 = row0;
+    call.tile.col0 = col0;
+    call.env.a_scale = a_scale ? a_scale + row0 : NULL;
+    call.env.b_scale = b_scale;
+    call.env.scale_type = scale_type;
+    call.env.bias_mode = bias_mode;
+    call.env.transpose = transpose;
+    call.user_ctx = user_ctx;
+    post_op(&call);
+}
+
 static inline void cute_run_post_op(
     cute_post_op_fn post_op,
     void *src,
@@ -92,24 +131,13 @@ static inline void cute_run_post_op(
     int tile_j,
     void *user_ctx)
 {
-    cute_post_call_t call;
-    call.tile.src = src;
-    call.tile.dst = dst;
-    call.tile.src_stride = src_stride;
-    call.tile.dst_stride = dst_stride;
-    call.tile.rows = CUTE_TILE_M;
-    call.tile.cols = CUTE_TILE_N;
-    call.tile.tile_i = tile_i;
-    call.tile.tile_j = tile_j;
-    call.tile.row0 = tile_i * CUTE_TILE_M;
-    call.tile.col0 = tile_j * CUTE_TILE_N;
-    call.env.a_scale = a_scale ? a_scale + call.tile.row0 : NULL;
-    call.env.b_scale = b_scale;
-    call.env.scale_type = scale_type;
-    call.env.bias_mode = bias_mode;
-    call.env.transpose = transpose;
-    call.user_ctx = user_ctx;
-    post_op(&call);
+    cute_run_post_op_shape(post_op, src, dst, src_stride, dst_stride,
+                           CUTE_TILE_M, CUTE_TILE_N,
+                           tile_i, tile_j,
+                           tile_i * CUTE_TILE_M,
+                           tile_j * CUTE_TILE_N,
+                           a_scale, b_scale, scale_type, bias_mode,
+                           transpose, user_ctx);
 }
 
 /* ---- Tiled Matmul without post-op pipeline ---- */
@@ -138,8 +166,9 @@ static inline void cute_tiled_matmul_no_pipeline_ex(
 
     /* helper: compute tile output pointer */
     #define _TILE_OUT_PTR(ti, tj) \
-        ((char *)output + (ti) * CUTE_TILE_M * output_stride + \
-         (tj) * CUTE_TILE_N * output_tile_elem_bytes)
+        ((char *)output + \
+         (transpose ? (tj) : (ti)) * CUTE_TILE_M * output_stride + \
+         (transpose ? (ti) : (tj)) * CUTE_TILE_N * output_tile_elem_bytes)
 
     /* helper: compute tile A data pointer */
     #define _TILE_A_PTR(ti) \
@@ -280,8 +309,9 @@ static inline void cute_tiled_matmul_pipeline_ex(
         return;
 
     #define _TILE_OUT_PTR(ti, tj) \
-        ((char *)output + (ti) * CUTE_TILE_M * output_stride + \
-         (tj) * CUTE_TILE_N * output_tile_elem_bytes)
+        ((char *)output + \
+         (transpose ? (tj) : (ti)) * CUTE_TILE_M * output_stride + \
+         (transpose ? (ti) : (tj)) * CUTE_TILE_N * output_tile_elem_bytes)
 
     #define _TILE_A_PTR(ti) \
         ((char *)a->data + (ti) * CUTE_TILE_M * a->stride)
@@ -349,6 +379,191 @@ static inline void cute_tiled_matmul_pipeline(
                                   bias, a_scale, b_scale, scale_type,
                                   bias_mode, transpose, double_buf0,
                                   double_buf1, post_op, post_ctx);
+}
+
+/* ---- Row-block matmul for post-ops that need the full N dimension ---- */
+static inline void cute_tiled_matmul_row_block_no_pipeline_ex(
+    const cute_tensor_t *a,
+    const cute_tensor_t *b,
+    void *output,
+    uint64_t output_stride,
+    uint64_t output_elem_bytes,
+    const cute_tensor_t *bias,
+    int rows_per_block,
+    float *a_scale, float *b_scale,
+    int scale_type, int bias_mode, int transpose,
+    void *double_buf,
+    cute_post_op_fn post_op,
+    void *post_ctx)
+{
+    int M = (int)a->rows, N = (int)b->cols, K = (int)a->cols;
+    int block_i = rows_per_block > 0 ? M / rows_per_block : 0;
+    uint64_t block_out_stride = (uint64_t)N * 4;
+
+    (void)output_elem_bytes;
+
+    if (block_i == 0)
+        return;
+
+    #define _ROW_BLOCK_OUT_PTR(bi) \
+        ((char *)output + (bi) * rows_per_block * output_stride)
+
+    #define _ROW_BLOCK_A_PTR(bi) \
+        ((char *)a->data + (bi) * rows_per_block * a->stride)
+
+    if (post_op == NULL) {
+        uint64_t tid = cute_matmul(
+            _ROW_BLOCK_A_PTR(0), a->stride,
+            b->data, b->stride,
+            bias->data, bias->stride,
+            _ROW_BLOCK_OUT_PTR(0), output_stride,
+            rows_per_block, N, K,
+            a->dtype, bias_mode, transpose, 0);
+
+        for (int bi = 1; bi < block_i; bi++) {
+            cute_wait_task(tid);
+            tid = cute_matmul(
+                _ROW_BLOCK_A_PTR(bi), a->stride,
+                b->data, b->stride,
+                bias->data, bias->stride,
+                _ROW_BLOCK_OUT_PTR(bi), output_stride,
+                rows_per_block, N, K,
+                a->dtype, bias_mode, transpose, 0);
+        }
+
+        cute_wait_task(tid);
+    } else {
+        uint64_t tid = cute_matmul(
+            _ROW_BLOCK_A_PTR(0), a->stride,
+            b->data, b->stride,
+            bias->data, bias->stride,
+            double_buf, block_out_stride,
+            rows_per_block, N, K,
+            a->dtype, bias_mode, transpose, 0);
+        int prev_bi = 0;
+
+        for (int bi = 1; bi < block_i; bi++) {
+            cute_wait_task(tid);
+
+            cute_run_post_op_shape(post_op, double_buf,
+                                   _ROW_BLOCK_OUT_PTR(prev_bi),
+                                   block_out_stride, output_stride,
+                                   rows_per_block, N,
+                                   prev_bi, 0,
+                                   prev_bi * rows_per_block, 0,
+                                   a_scale, b_scale, scale_type,
+                                   bias_mode, transpose, post_ctx);
+
+            tid = cute_matmul(
+                _ROW_BLOCK_A_PTR(bi), a->stride,
+                b->data, b->stride,
+                bias->data, bias->stride,
+                double_buf, block_out_stride,
+                rows_per_block, N, K,
+                a->dtype, bias_mode, transpose, 0);
+            prev_bi = bi;
+        }
+
+        cute_wait_task(tid);
+        cute_run_post_op_shape(post_op, double_buf,
+                               _ROW_BLOCK_OUT_PTR(prev_bi),
+                               block_out_stride, output_stride,
+                               rows_per_block, N,
+                               prev_bi, 0,
+                               prev_bi * rows_per_block, 0,
+                               a_scale, b_scale, scale_type,
+                               bias_mode, transpose, post_ctx);
+    }
+
+    #undef _ROW_BLOCK_OUT_PTR
+    #undef _ROW_BLOCK_A_PTR
+}
+
+static inline void cute_tiled_matmul_row_block_pipeline_ex(
+    const cute_tensor_t *a,
+    const cute_tensor_t *b,
+    void *output,
+    uint64_t output_stride,
+    uint64_t output_elem_bytes,
+    const cute_tensor_t *bias,
+    int rows_per_block,
+    float *a_scale, float *b_scale,
+    int scale_type, int bias_mode, int transpose,
+    void *double_buf0, void *double_buf1,
+    cute_post_op_fn post_op,
+    void *post_ctx)
+{
+    int M = (int)a->rows, N = (int)b->cols, K = (int)a->cols;
+    int block_i = rows_per_block > 0 ? M / rows_per_block : 0;
+    uint64_t block_out_stride = (uint64_t)N * 4;
+    void *bufs[2] = {double_buf0, double_buf1};
+
+    (void)output_elem_bytes;
+
+    if (post_op == NULL || double_buf0 == NULL || double_buf1 == NULL) {
+        cute_tiled_matmul_row_block_no_pipeline_ex(
+            a, b, output, output_stride, output_elem_bytes, bias,
+            rows_per_block, a_scale, b_scale, scale_type, bias_mode,
+            transpose, double_buf0, post_op, post_ctx);
+        return;
+    }
+
+    if (block_i == 0)
+        return;
+
+    #define _ROW_BLOCK_OUT_PTR(bi) \
+        ((char *)output + (bi) * rows_per_block * output_stride)
+
+    #define _ROW_BLOCK_A_PTR(bi) \
+        ((char *)a->data + (bi) * rows_per_block * a->stride)
+
+    int prev_bi = 0, prev_buf = 0;
+    uint64_t tid = cute_matmul(
+        _ROW_BLOCK_A_PTR(prev_bi), a->stride,
+        b->data, b->stride,
+        bias->data, bias->stride,
+        bufs[prev_buf], block_out_stride,
+        rows_per_block, N, K,
+        a->dtype, bias_mode, transpose, 0);
+
+    for (int bi = 1; bi < block_i; bi++) {
+        int curr_buf = bi & 1;
+
+        cute_wait_task(tid);
+
+        tid = cute_matmul(
+            _ROW_BLOCK_A_PTR(bi), a->stride,
+            b->data, b->stride,
+            bias->data, bias->stride,
+            bufs[curr_buf], block_out_stride,
+            rows_per_block, N, K,
+            a->dtype, bias_mode, transpose, 0);
+
+        cute_run_post_op_shape(post_op, bufs[prev_buf],
+                               _ROW_BLOCK_OUT_PTR(prev_bi),
+                               block_out_stride, output_stride,
+                               rows_per_block, N,
+                               prev_bi, 0,
+                               prev_bi * rows_per_block, 0,
+                               a_scale, b_scale, scale_type,
+                               bias_mode, transpose, post_ctx);
+
+        prev_bi = bi;
+        prev_buf = curr_buf;
+    }
+
+    cute_wait_task(tid);
+    cute_run_post_op_shape(post_op, bufs[prev_buf],
+                           _ROW_BLOCK_OUT_PTR(prev_bi),
+                           block_out_stride, output_stride,
+                           rows_per_block, N,
+                           prev_bi, 0,
+                           prev_bi * rows_per_block, 0,
+                           a_scale, b_scale, scale_type,
+                           bias_mode, transpose, post_ctx);
+
+    #undef _ROW_BLOCK_OUT_PTR
+    #undef _ROW_BLOCK_A_PTR
 }
 
 /* Backward-compatible alias for the non-pipelined implementation. */

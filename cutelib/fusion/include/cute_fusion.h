@@ -40,15 +40,27 @@ static inline void cute_post_dequant_rope_bf16cvt(const cute_post_call_t *call)
 
 static inline void cute_post_dequant_bf16cvt(const cute_post_call_t *call)
 {
-    cute_fuse_dequant_bf16cvt_tile(
-        (const int32_t *)call->tile.src,
-        call->tile.src_stride,
-        call->tile.dst,
-        call->tile.dst_stride,
-        call->env.a_scale,
-        call->env.b_scale,
-        call->tile.rows,
-        call->tile.cols);
+    if (call->env.transpose) {
+        cute_fuse_dequant_bf16cvt_transpose_tile(
+            (const int32_t *)call->tile.src,
+            call->tile.src_stride,
+            call->tile.dst,
+            call->tile.dst_stride,
+            call->env.a_scale,
+            call->env.b_scale,
+            call->tile.rows,
+            call->tile.cols);
+    } else {
+        cute_fuse_dequant_bf16cvt_tile(
+            (const int32_t *)call->tile.src,
+            call->tile.src_stride,
+            call->tile.dst,
+            call->tile.dst_stride,
+            call->env.a_scale,
+            call->env.b_scale,
+            call->tile.rows,
+            call->tile.cols);
+    }
 }
 
 static inline void cute_post_masked_softmax_kvscale_bf16cvt(

@@ -1,0 +1,6 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 3
+cases:
+  - fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64
+  - fusion_attention_context_f16_m128_n64_k128

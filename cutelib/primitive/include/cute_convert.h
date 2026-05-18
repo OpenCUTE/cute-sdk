@@ -79,6 +79,30 @@ static inline void cute_dequant_i32_to_f16_tile(const int32_t *input, uint64_t i
     }
 }
 
+static inline void cute_dequant_i32_to_f16_transpose_tile(
+    const int32_t *input, uint64_t input_stride,
+    void *output, uint64_t output_stride,
+    const float *input_scale,
+    const float *weight_scale,
+    int rows, int cols)
+{
+    for (int r = 0; r < rows; r++) {
+        const int32_t *input_row = (const int32_t *)((const char *)input + r * input_stride);
+        _Float16 *output_row = (_Float16 *)((char *)output + r * output_stride);
+        size_t vl;
+        for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vint32m4_t input_vec = __riscv_vle32_v_i32m4(&input_row[c], vl);
+            vfloat32m4_t scale_vec = __riscv_vle32_v_f32m4(&input_scale[c], vl);
+            scale_vec = __riscv_vfmul_vf_f32m4(scale_vec, weight_scale[0], vl);
+            vfloat32m4_t deq = __riscv_vfmul_vv_f32m4(
+                __riscv_vfcvt_f_x_v_f32m4(input_vec, vl), scale_vec, vl);
+            vfloat16m2_t deq_f16 = __riscv_vfncvt_f_f_w_f16m2(deq, vl);
+            __riscv_vse16_v_f16m2(&output_row[c], deq_f16, vl);
+        }
+    }
+}
+
 static inline void cute_dequant_i32_to_bf16_tile(const int32_t *input, uint64_t input_stride,
                                                  void *output, uint64_t output_stride,
                                                  const float *input_scale,
@@ -87,6 +111,19 @@ static inline void cute_dequant_i32_to_bf16_tile(const int32_t *input, uint64_t 
 {
     cute_dequant_i32_to_f16_tile(input, input_stride, output, output_stride,
                                  input_scale, weight_scale, rows, cols);
+}
+
+static inline void cute_dequant_i32_to_bf16_transpose_tile(
+    const int32_t *input, uint64_t input_stride,
+    void *output, uint64_t output_stride,
+    const float *input_scale,
+    const float *weight_scale,
+    int rows, int cols)
+{
+    cute_dequant_i32_to_f16_transpose_tile(input, input_stride,
+                                           output, output_stride,
+                                           input_scale, weight_scale,
+                                           rows, cols);
 }
 
 #endif /* CUTE_CONVERT_H */
