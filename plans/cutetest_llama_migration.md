@@ -472,7 +472,7 @@ tiled 测试需要 golden 数据（256×256 的 I8 matmul），可从 cutetest �
 
 > 目标：先将 llama3_1B.c 中的单算子拆成可独立验证的 primitive，再组合成 6 个 fusion post-op。
 > 推荐实施顺序：先做单算子 primitive，再实现 fusion/pipeline 组合。
-> 细化计划：[`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) → [`phaseC1_fusion_primitive.md`](phaseC1_fusion_primitive.md)
+> 细化计划：[`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) → [`phaseC1_vector_primitive.md`](phaseC1_vector_primitive.md) → [`phaseC1_fusion_case.md`](phaseC1_fusion_case.md)
 
 #### C.1 目录结构
 
@@ -497,8 +497,9 @@ cutelib/fusion/
 | Primitive | 来源/用途 |
 |---|---|
 | `cute_matmul_op` / `cute_blockscale_matmul_op` | 单次 matmul API（来自 Phase B / L1 tensor） |
+| `cute_fast_sqrt` | RMSnorm / RMSnorm_with_scale 共享 helper |
 | `cute_vec_exp` / `cute_vec_sin` / `cute_vec_cos` | 原 RVV helper |
-| `cute_dequant_i32_to_f32_tile` / `cute_dequant_i32_to_bf16_tile` | I32 accumulator 后处理 |
+| `cute_dequant_i32_to_f32_tile` / `cute_dequant_i32_to_bf16_tile` / `cute_f32_to_f16_tile` / `cute_f32_to_bf16_tile` | I32/F32 结果 store helper |
 | `cute_silu_tile` / `cute_hadamard_tile` / `cute_resadd_tile` | elementwise |
 | `cute_rope_bf16_tile` / `cute_masked_softmax_bf16_tile` | sequence op |
 | `cute_smoothquant` / `cute_rmsnorm` / `cute_rmsnorm_with_scale` | 独立 quant/norm op |
@@ -566,10 +567,13 @@ target_link_libraries(cutelib_fusion INTERFACE cutelib_primitive)
 | `test_sequence_rope` | 64×64 F32 | RoPE primitive bit-exact |
 | `test_smoothquant` | 128×2048 F32 | 输出 INT8 + scale 与原实现一致 |
 | `test_rmsnorm` | 128×2048 F32 + weight | bit-exact |
+| `test_rmsnorm_scale_batch1_seq_len128_hidden_dim2048` | 128×2048 F32 + weight | bit-exact + absmax scale |
 | `test_fuse_dequant_bf16cvt` | 64×64 I32 + scale | fused post-op bit-exact |
 | `test_fuse_dequant_silu` | 64×64 I32 + scale | fused post-op bit-exact |
 
 golden 数据来源：从 llama3_1B.c 中提取固定输入，截取中间结果作为 golden。
+
+`cute_fast_sqrt` 没有单独的 test case，但会被两个 RMSNorm case 直接覆盖。
 
 ### Phase D：L4 cutelib/layer
 

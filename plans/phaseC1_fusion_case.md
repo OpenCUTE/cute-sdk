@@ -1,10 +1,10 @@
-# Phase C1 / Phase 3b: fusion/pipeline 组合实现计划
+# Phase C1 / Phase 3b: fusion case 组合实现计划
 
 ## Context
 
 cute-sdk 需要把 Phase C0 中已经验证的 L2 单算子 primitive 组合成 L3 `cutelib/fusion` post-op，供 L1 tensor 的 `cute_tiled_matmul` pipeline 回调和 L4 layer 的 `cute_llama_block` 编排复用。
 
-本计划建议在 [`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) 之后执行：先实现并验证单算子 primitive，再由 fusion 层把 primitive 组合成 `cute_tiled_matmul` 的 fused post-op，并接入 pipeline。
+本计划建议在 [`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) 和 [`phaseC1_vector_primitive.md`](phaseC1_vector_primitive.md) 之后执行：先把向量 primitive 接口收敛好，再由 fusion case 层把 primitive 组合成 `cute_tiled_matmul` 的 fused post-op，并接入不同调度模式。
 
 在真正进入 fusion 之前，还需要先补一条 `notile` 参考软件路径：它面向同一份 golden，但不做 tile 级拆分，先验证“完成 cute matmul 之后再做向量后处理”的整块语义；之后再推进 `nopipeline` 和 `pipeline` 两种 tiled 版本。
 
