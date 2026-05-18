@@ -17,6 +17,10 @@
       {
         "tensor": "golden_hadamard_output",
         "symbol": "output"
+      },
+      {
+        "tensor": "golden_hadamard_row_absmax",
+        "symbol": "row_absmax"
       }
     ]
   }

@@ -16,7 +16,7 @@
     "tensors": [
       {
         "tensor": "golden_silu_golden_y",
-        "symbol": "data"
+        "symbol": "output"
       }
     ]
   }

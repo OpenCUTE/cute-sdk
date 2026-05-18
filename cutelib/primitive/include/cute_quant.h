@@ -9,8 +9,10 @@
 
 #include "cute_vec_math.h"
 
-static inline void cute_smoothquant_stage1_getscale(const float *input, float *scale,
-                                                    int rows, int cols)
+static inline void cute_primitive_smoothquant_stage1_getscale_impl(const float *input,
+                                                                   float *scale,
+                                                                   int rows,
+                                                                   int cols)
 {
     assert(cols % (64 * 4) == 0);
     assert(rows % 16 == 0);
@@ -36,9 +38,11 @@ static inline void cute_smoothquant_stage1_getscale(const float *input, float *s
     }
 }
 
-static inline void cute_smoothquant_stage2_quant(const float *input, int8_t *output,
-                                                 const float *scale,
-                                                 int rows, int cols)
+static inline void cute_primitive_smoothquant_stage2_quant_impl(const float *input,
+                                                                int8_t *output,
+                                                                const float *scale,
+                                                                int rows,
+                                                                int cols)
 {
     for (int r = 0; r < rows; r++) {
         const float *row = &input[r * cols];
@@ -63,9 +67,9 @@ static inline void cute_smoothquant(float *input, int rows, int cols,
                                     bool need_stage1)
 {
     if (need_stage1) {
-        cute_smoothquant_stage1_getscale(input, output_scale, rows, cols);
+        cute_primitive_smoothquant_stage1_getscale_impl(input, output_scale, rows, cols);
     }
-    cute_smoothquant_stage2_quant(input, output, output_scale, rows, cols);
+    cute_primitive_smoothquant_stage2_quant_impl(input, output, output_scale, rows, cols);
 }
 
 static inline void cute_rmsnorm(const float *input, float *output,

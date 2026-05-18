@@ -173,26 +173,29 @@ cute-sdk/
 ├── cuteisa/            # ISA artifacts（instruction.h / isa.json）
 │   └── cute_isa_v1/
 ├── ops/                # Op Spec 契约层（op 的语义定义，独立于实现和测试）
-│   ├── tensor/         #   tensor 级 op（matmul / conv）
-│   ├── layer/          #   layer 级 op（conv2d_layer / ffn / attention）
-│   └── model/          #   model 级 op
+│   ├── tensor/         #   tensor 级 op（matmul）
+│   └── vector/         #   vector primitive op（dequant / vec math / RoPE / softmax 等）
 ├── cuteqemu/           # 功能级模拟器
-├── nvwa/               # Golden 生成与多平台对齐
 ├── memverify/          # 内存比对引擎
 ├── cutelib/            # 分层库函数（实现 ops/ 中定义的 op spec）
 │   ├── runtime/        #   runtime lib（cute_runtime.h）
 │   ├── tensor/         #   tensor lib
-│   ├── layer/          #   layer lib
-│   ├── fusion/         #   fusion lib
-│   └── model/          #   model lib
+│   └── primitive/      #   standalone vector/math primitives
 ├── tests/              # 测试用例（case manifest 驱动）
-│   └── runtime/
+│   ├── runtime/        #   runtime-level CUTE ISA tests
+│   ├── tensor/         #   tensor API tests
+│   ├── primitive/      #   primitive API tests
+│   ├── smoke.yaml      #   smoke test suite
+│   └── vecprimitive.yaml # vector primitive test suite
 ├── golden/             # Golden 参考数据
-│   └── manual/         #   人工 golden（从 cutetest .h 文件导入）
+│   └── manual/         #   固定 golden 数据与生成器
+│       ├── tensor/
+│       ├── vector/
+│       └── generators/
+├── plans/              # 分阶段迁移 / 实现计划
 ├── CMakeLists.txt      # 根 CMake（层叠 target + test 函数）
 ├── cmake/
 │   └── riscv-toolchain.cmake  # RISC-V 交叉编译 toolchain
-├── run_test.py         # test runner: build → simulate → verify
 ├── readme.md
 └── timeline.md
 ```

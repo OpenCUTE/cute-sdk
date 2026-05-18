@@ -1,6 +1,6 @@
 {
   "id": "primitive_rmsnorm_scale_batch1_seq_len128_hidden_dim2048",
-  "op_ref": "ops/vector/rmsnorm_scale.yaml",
+  "op_ref": "ops/vector/rmsnorm.yaml",
   "level": "primitive",
   "build": {
     "source": "test.c",
@@ -17,6 +17,10 @@
       {
         "tensor": "golden_rmsnorm_output",
         "symbol": "output"
+      },
+      {
+        "tensor": "golden_rmsnorm_per_token_scale",
+        "symbol": "per_token_scale"
       }
     ]
   }

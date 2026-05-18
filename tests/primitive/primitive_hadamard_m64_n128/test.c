@@ -29,6 +29,7 @@ int main(void)
                        GOLDEN_HADAMARD_M,
                        GOLDEN_HADAMARD_N - split_cols);
 
+    cute_test_publish_f32_trace(row_absmax, GOLDEN_HADAMARD_M);
     cute_test_host_verify_barrier();
     return 0;
 }

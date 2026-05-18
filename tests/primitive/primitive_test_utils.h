@@ -1,8 +1,8 @@
 #ifndef CUTE_PRIMITIVE_TEST_UTILS_H
 #define CUTE_PRIMITIVE_TEST_UTILS_H
 
+#include <riscv_vector.h>
 #include <stddef.h>
-#include <string.h>
 
 #define CUTE_TEST_ALIGN __attribute__((aligned(64)))
 #define CUTE_TEST_BLOCK 64
@@ -12,9 +12,14 @@ static inline void cute_test_host_verify_barrier(void)
     __asm__ volatile ("fence rw, rw" ::: "memory");
 }
 
-static inline int cute_check_bytes(const void *actual, const void *expected, size_t bytes)
+static inline void cute_test_publish_f32_trace(float *data, size_t elements)
 {
-    return memcmp(actual, expected, bytes) == 0 ? 0 : 1;
+    for (size_t i = 0; i < elements;) {
+        size_t vl = __riscv_vsetvl_e32m4(elements - i);
+        vfloat32m4_t values = __riscv_vle32_v_f32m4(&data[i], vl);
+        __riscv_vse32_v_f32m4(&data[i], values, vl);
+        i += vl;
+    }
 }
 
 static inline size_t cute_test_min_size(size_t lhs, size_t rhs)

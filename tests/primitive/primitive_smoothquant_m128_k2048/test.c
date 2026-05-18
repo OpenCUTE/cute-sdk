@@ -17,6 +17,7 @@ int main(void)
                      scale,
                      true);
 
+    cute_test_publish_f32_trace(scale, GOLDEN_SMOOTHQUANT_M);
     cute_test_host_verify_barrier();
     return 0;
 }

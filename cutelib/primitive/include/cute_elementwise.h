@@ -8,25 +8,58 @@
 
 #include "cute_vec_math.h"
 
-static inline float cute_silu_scalar(float x)
+static inline float cute_primitive_silu_scalar_impl(float x)
 {
     return x / (1.0f + expf(-x));
 }
 
-static inline void cute_silu_tile(float *data, uint64_t stride, int rows, int cols)
+static inline void cute_silu_out_tile(const float *input, uint64_t input_stride,
+                                      float *output, uint64_t output_stride,
+                                      int rows, int cols)
 {
     for (int r = 0; r < rows; r++) {
-        float *row = (float *)((char *)data + r * stride);
+        const float *in_row = (const float *)((const char *)input + r * input_stride);
+        float *out_row = (float *)((char *)output + r * output_stride);
         size_t vl;
         for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
             vl = __riscv_vsetvl_e32m4(avl);
-            vfloat32m4_t x = __riscv_vle32_v_f32m4(&row[c], vl);
+            vfloat32m4_t x = __riscv_vle32_v_f32m4(&in_row[c], vl);
             vfloat32m4_t exp_neg_x = cute_vec_exp(__riscv_vfneg_v_f32m4(x, vl), vl);
             vfloat32m4_t silu = __riscv_vfdiv_vv_f32m4(
                 x, __riscv_vfadd_vf_f32m4(exp_neg_x, 1.0f, vl), vl);
-            __riscv_vse32_v_f32m4(&row[c], silu, vl);
+            __riscv_vse32_v_f32m4(&out_row[c], silu, vl);
         }
     }
+}
+
+static inline void cute_silu_out_tile_fast(const float *input, uint64_t input_stride,
+                                           float *output, uint64_t output_stride,
+                                           int rows, int cols)
+{
+    for (int r = 0; r < rows; r++) {
+        const float *in_row = (const float *)((const char *)input + r * input_stride);
+        float *out_row = (float *)((char *)output + r * output_stride);
+        size_t vl;
+        for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vfloat32m4_t x = __riscv_vle32_v_f32m4(&in_row[c], vl);
+            vfloat32m4_t exp_neg_x = cute_vec_exp(__riscv_vfneg_v_f32m4(x, vl), vl);
+            vfloat32m4_t denominator = __riscv_vfadd_vf_f32m4(exp_neg_x, 1.0f, vl);
+            vfloat32m4_t silu = __riscv_vfmul_vv_f32m4(
+                x, cute_vec_recip_approx(denominator, vl), vl);
+            __riscv_vse32_v_f32m4(&out_row[c], silu, vl);
+        }
+    }
+}
+
+static inline void cute_silu_tile(float *data, uint64_t stride, int rows, int cols)
+{
+    cute_silu_out_tile(data, stride, data, stride, rows, cols);
+}
+
+static inline void cute_silu_tile_fast(float *data, uint64_t stride, int rows, int cols)
+{
+    cute_silu_out_tile_fast(data, stride, data, stride, rows, cols);
 }
 
 static inline void cute_hadamard_tile(const float *lhs, uint64_t lhs_stride,

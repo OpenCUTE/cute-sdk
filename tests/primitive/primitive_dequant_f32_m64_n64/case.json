@@ -1,6 +1,6 @@
 {
   "id": "primitive_dequant_f32_m64_n64",
-  "op_ref": "ops/vector/dequant_f32.yaml",
+  "op_ref": "ops/vector/dequant.yaml",
   "level": "primitive",
   "build": {
     "source": "test.c",

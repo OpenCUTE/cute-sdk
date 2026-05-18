@@ -17,6 +17,10 @@
       {
         "tensor": "golden_smoothquant_output_i8",
         "symbol": "output"
+      },
+      {
+        "tensor": "golden_smoothquant_scale",
+        "symbol": "scale"
       }
     ]
   }

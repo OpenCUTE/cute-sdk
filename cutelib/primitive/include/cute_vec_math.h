@@ -13,6 +13,20 @@ static inline float cute_fast_sqrt(float x)
     return result;
 }
 
+static inline vfloat32m4_t cute_vec_recip_approx(vfloat32m4_t x, size_t vl)
+{
+    vfloat32m4_t recip;
+    __asm__ volatile ("vfrec7.v %0, %1" : "=vr"(recip) : "vr"(x));
+
+    vfloat32m4_t two = __riscv_vfmv_v_f_f32m4(2.0f, vl);
+    vfloat32m4_t correction = __riscv_vfnmsac_vv_f32m4(two, x, recip, vl);
+    recip = __riscv_vfmul_vv_f32m4(recip, correction, vl);
+
+    correction = __riscv_vfnmsac_vv_f32m4(two, x, recip, vl);
+    recip = __riscv_vfmul_vv_f32m4(recip, correction, vl);
+    return recip;
+}
+
 static inline vfloat32m4_t cute_vec_exp(vfloat32m4_t x, size_t vl)
 {
     const float NEG_LN2 = -0.69314718056f;
@@ -81,9 +95,10 @@ static inline vfloat32m4_t cute_vec_sin(vfloat32m4_t x, size_t vl)
 {
     const float PI = 3.14159265359f;
     const float PI_DIV_2 = PI / 2.0f;
+    const float INV_PI = 0.31830988618f;
     vfloat32m4_t new_rad = __riscv_vfadd_vv_f32m4(x, __riscv_vfmv_v_f_f32m4(PI_DIV_2, vl), vl);
     vfloat32m4_t pi_vec = __riscv_vfmv_v_f_f32m4(PI, vl);
-    vfloat32m4_t round = __riscv_vfdiv_vv_f32m4(new_rad, pi_vec, vl);
+    vfloat32m4_t round = __riscv_vfmul_vf_f32m4(new_rad, INV_PI, vl);
     vfloat32m4_t magic = __riscv_vfmv_v_f_f32m4(0x1.8p23f, vl);
     round = __riscv_vfadd_vv_f32m4(round, magic, vl);
     round = __riscv_vfsub_vv_f32m4(round, magic, vl);

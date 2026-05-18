@@ -1,6 +1,6 @@
 {
   "id": "primitive_rope_pos0_m64_head_dim64_n_head1",
-  "op_ref": "ops/vector/rope_pos0.yaml",
+  "op_ref": "ops/vector/rope.yaml",
   "level": "primitive",
   "build": {
     "source": "test.c",
