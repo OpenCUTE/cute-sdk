@@ -6,6 +6,8 @@ cute-sdk 需要把 Phase C0 中已经验证的 L2 单算子 primitive 组合成 
 
 本计划建议在 [`phaseC0_single_primitive.md`](phaseC0_single_primitive.md) 之后执行：先实现并验证单算子 primitive，再由 fusion 层把 primitive 组合成 `cute_tiled_matmul` 的 fused post-op，并接入 pipeline。
 
+在真正进入 fusion 之前，还需要先补一条 `notile` 参考软件路径：它面向同一份 golden，但不做 tile 级拆分，先验证“完成 cute matmul 之后再做向量后处理”的整块语义；之后再推进 `nopipeline` 和 `pipeline` 两种 tiled 版本。
+
 Phase C1 的核心目标不是重写数学逻辑，而是做组合和适配：
 
 1. 复用 Phase C0 已验证的 primitive，确保 bit-exact。
@@ -30,7 +32,19 @@ Phase C1 的核心目标不是重写数学逻辑，而是做组合和适配：
 
 `smoothquant`、`RMSnorm`、`RMSnorm_With_getabsmax_scale`、`vec_exp`、`vec_sin`、`vec_cos` 等不属于 fusion 组合层，放在 Phase C0 单算子 primitive 中实现。
 
-### 1.2 Phase C1 不做的事情
+### 1.2 三种软件实现模式
+
+同一份 golden、同一套算子语义下，C1 相关的软件实现分成 3 个 `.c` 入口：
+
+| 模式 | 行为 | 目的 |
+|---|---|---|
+| `notile` | matmul 完成后，直接对完整输出 buffer 做向量后处理，不拆 tile，也不做 overlap | 最粗的 reference 路径，先把 cute + vector 的端到端语义跑通 |
+| `nopipeline` | 按 tile 拆分 matmul 与后处理，但 CPU post-op 与 CUTE 串行，不做 overlap | 验证 tile 边界、地址映射和每个 tile 的后处理结果 |
+| `pipeline` | tile 拆分 + 双 buffer overlap | 最终高性能路径 |
+
+这 3 个 `.c` 共用同一个 golden，只是调度粒度不同。
+
+### 1.3 Phase C1 不做的事情
 
 - 不重新实现 Phase C0 已完成的 primitive 数学逻辑。
 - 不改变 Phase B 的 tile 调度策略。
@@ -49,14 +63,34 @@ cutelib/fusion/include/
 
 tests/fusion/
     test_fuse_dequant_rope_bf16cvt/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
     test_fuse_dequant_bf16cvt/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
     test_fuse_masked_softmax_kvscale_bf16cvt/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
     test_fuse_dequant_silu/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
     test_fuse_dequant_hadamard/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
     test_fuse_dequant_resadd/
+        test_notile.c
+        test_nopipeline.c
+        test_pipeline.c
 ```
 
 如果项目继续保持 header-only 风格，`cutelib/fusion/include/*.h` 内全部使用 `static inline`。如果编译时间或重复符号成为问题，再把实现拆到 `cutelib/fusion/src/*.c`，但 Phase C1 第一版不做该拆分。
+
+每个 `tests/fusion/<case>/` 建议共用一份 `case.json` / golden manifest，再挂三份软件入口：`test_notile.c`、`test_nopipeline.c`、`test_pipeline.c`。
 
 ---
 
@@ -295,6 +329,8 @@ endfunction()
 - `fusion/test_fuse_dequant_hadamard`
 - `fusion/test_fuse_masked_softmax_kvscale_bf16cvt`
 
+每个 case 再由 helper 展开成 `notile` / `nopipeline` / `pipeline` 三个入口，不需要在 smoke 里手写 18 条名字。
+
 ---
 
 ## 6. 测试与 golden
@@ -307,7 +343,11 @@ endfunction()
 2. 如果已有 cutetest 中间结果头文件，直接 include。
 3. 如果没有 golden，新增一个临时 dump 分支从原 `llama3_1B.c` 生成，不手写期望值。
 
+同一个 golden 要同时喂给 `notile` / `nopipeline` / `pipeline` 三种软件入口，只是它们对 matmul 结果的消费方式不同。
+
 ### 6.2 测试矩阵
+
+下面每个 case 都要分别跑 `notile`、`nopipeline`、`pipeline` 三种入口，golden 只维护一份。
 
 | 测试 | 输入 shape | 验证内容 |
 |---|---:|---|
@@ -338,6 +378,7 @@ python3 tools/runner/cute-test.py --suite cute-sdk/tests/smoke.yaml --skip-build
 
 | 步骤 | 内容 | 依赖 | 预计耗时 |
 |------|------|------|---------|
+| 0 | 先完成 notile 参考软件 | 同一 golden 的整块后处理入口 | 30 min |
 | 1 | 创建 fusion 头文件骨架 | L1 tensor API + Phase C0 primitive | 15 min |
 | 2 | 组合 SiLU/ResAdd/BF16 简单 fusion | Phase C0 convert/elementwise | 45 min |
 | 3 | 组合 RoPE fusion | Phase C0 convert/rope | 45 min |
