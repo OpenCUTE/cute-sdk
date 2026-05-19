@@ -71,6 +71,15 @@ target_include_directories(cutelib_fusion INTERFACE
 target_link_libraries(cutelib_fusion INTERFACE cutelib_tensor cutelib_primitive)
 
 # ============================================================
+# L4: cutelib/layer — layer orchestration APIs
+# ============================================================
+add_library(cutelib_layer INTERFACE)
+target_include_directories(cutelib_layer INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/cutelib/layer/include
+)
+target_link_libraries(cutelib_layer INTERFACE cutelib_fusion)
+
+# ============================================================
 # Tests
 # ============================================================
 
@@ -232,3 +241,36 @@ add_fusion_test_variant(fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k
 add_fusion_test_variant(fusion_attention_context_f16_m128_n64_k128 notile test_notile.c)
 add_fusion_test_variant(fusion_attention_context_f16_m128_n64_k128 nopipeline test_nopipeline.c)
 add_fusion_test_variant(fusion_attention_context_f16_m128_n64_k128 pipeline test_pipeline.c)
+
+# ============================================================
+# Layer tests
+# ============================================================
+
+function(add_layer_test case_dir)
+    get_filename_component(case_name ${case_dir} NAME)
+    set(test_src ${CMAKE_CURRENT_SOURCE_DIR}/tests/layer/${case_dir}/test.c)
+    set(data_dir ${CMAKE_CURRENT_SOURCE_DIR}/tests/layer/${case_dir})
+
+    if(NOT EXISTS ${test_src})
+        message(WARNING "Skipping ${case_name}: test.c not found")
+        return()
+    endif()
+
+    add_executable(${case_name} ${test_src})
+    target_include_directories(${case_name} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${data_dir}
+    )
+    target_link_libraries(${case_name} PRIVATE
+        cutelib_layer
+        cute_riscv_vector_baremetal_options
+        m
+    )
+    set_target_properties(${case_name} PROPERTIES
+        SUFFIX .riscv
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/layer
+    )
+endfunction()
+
+add_layer_test(llama_block_zero_weight_seq128_embed64)
+add_layer_test(llama_block_zero_weight_1b_shape_seq128)

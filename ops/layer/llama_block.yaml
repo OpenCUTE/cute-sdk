@@ -1,0 +1,140 @@
+op: llama_block
+level: layer
+domain: transformer
+version: 1
+
+description: |
+  Single LLaMA decoder block assembled from cute-sdk primitive, tensor, and
+  fusion APIs. The layer follows the execution order of
+  cutetest/transformer_test/llama/llama3_1B.c: attention RMSNorm,
+  quantized Q/K/V projections, RoPE, causal masked softmax, attention output
+  projection with residual add, FFN RMSNorm, gated SiLU FFN, and final
+  residual add.
+
+inputs:
+  X:
+    type: Tensor
+    description: Input hidden states.
+    dtype: F32
+    shape: [SEQ_LEN, EMBED_DIM]
+  attn_norm_weight:
+    type: Tensor
+    dtype: F32
+    shape: [EMBED_DIM]
+  ffn_norm_weight:
+    type: Tensor
+    dtype: F32
+    shape: [EMBED_DIM]
+  proj_q_weight:
+    type: Tensor
+    dtype: I8
+    shape: [N_HEAD_Q * KEY_DIM, EMBED_DIM]
+  proj_k_weight:
+    type: Tensor
+    dtype: I8
+    shape: [N_HEAD_KV * KEY_DIM, EMBED_DIM]
+  proj_v_weight:
+    type: Tensor
+    dtype: I8
+    shape: [N_HEAD_KV * VALUE_DIM, EMBED_DIM]
+  proj_o_weight:
+    type: Tensor
+    dtype: I8
+    shape: [EMBED_DIM, N_HEAD_Q * VALUE_DIM]
+  ffn_gate_weight:
+    type: Tensor
+    dtype: I8
+    shape: [FFN_DIM, EMBED_DIM]
+  ffn_up_weight:
+    type: Tensor
+    dtype: I8
+    shape: [FFN_DIM, EMBED_DIM]
+  ffn_down_weight:
+    type: Tensor
+    dtype: I8
+    shape: [EMBED_DIM, FFN_DIM]
+  rope_theta:
+    type: Tensor
+    dtype: F32
+    shape: [KEY_DIM / 2]
+  causal_mask:
+    type: Tensor
+    dtype: I8
+    shape: [SEQ_LEN, ceil(MAX_CTX_LEN / 8)]
+
+outputs:
+  Y:
+    type: Tensor
+    description: Output hidden states after the attention and FFN residuals.
+    dtype: F32
+    shape: [SEQ_LEN, EMBED_DIM]
+
+attributes:
+  SEQ_LEN:
+    type: int
+  EMBED_DIM:
+    type: int
+  KEY_DIM:
+    type: int
+  VALUE_DIM:
+    type: int
+  N_HEAD_Q:
+    type: int
+  N_HEAD_KV:
+    type: int
+  FFN_DIM:
+    type: int
+  MAX_CTX_LEN:
+    type: int
+  rms_epsilon:
+    type: F32
+  kv_scale:
+    type: F32
+  use_pipeline:
+    type: bool
+    default: true
+
+semantics: |
+  The layer computes:
+
+    attn_norm = RMSNorm(X, attn_norm_weight)
+    attn_q8 = SmoothQuant(attn_norm, scale from RMSNorm absmax)
+    Q = Dequant(MatMul(attn_q8, Wq)) + RoPE -> BF16
+    K = Dequant(MatMul(attn_q8, Wk)) + RoPE -> BF16
+    V = Dequant(MatMul(attn_q8, Wv)) -> BF16, transposed for attention
+    scores = softmax(mask((Q * K^T) * kv_scale))
+    context = scores * V
+    attn_out = Dequant(MatMul(SmoothQuant(context), Wo)) + X
+    ffn_norm = RMSNorm(attn_out, ffn_norm_weight)
+    gate = SiLU(Dequant(MatMul(SmoothQuant(ffn_norm), Wgate)))
+    up = gate * Dequant(MatMul(SmoothQuant(ffn_norm), Wup))
+    Y = Dequant(MatMul(SmoothQuant(up), Wdown)) + attn_out
+
+  All intermediate buffers are caller-provided through
+  cute_llama_block_workspace_t; the layer does not allocate memory.
+
+constraints:
+  - SEQ_LEN % 64 == 0
+  - EMBED_DIM % 64 == 0
+  - KEY_DIM == VALUE_DIM
+  - KEY_DIM % 64 == 0
+  - N_HEAD_Q % N_HEAD_KV == 0
+  - N_HEAD_Q * VALUE_DIM == EMBED_DIM
+  - causal_mask must encode valid positions with one bit per key position
+  - workspace buffers and weights must be 64 byte aligned
+
+implementation:
+  api: cute_llama_block
+  header: cutelib/layer/include/cute_llama.h
+  reference_source: cutetest/transformer_test/llama/llama3_1B.c
+
+test_plan:
+  cases:
+    - case_id: llama_block_zero_weight_seq128_embed64
+      case_path: tests/layer/llama_block_zero_weight_seq128_embed64
+      description: First pipeline smoke with real SEQ_LEN=128 and sliced width.
+  verify:
+    mode: return_code_and_bit_exact
+    tolerance:
+      F32: 0.05
+      BF16: 0.5

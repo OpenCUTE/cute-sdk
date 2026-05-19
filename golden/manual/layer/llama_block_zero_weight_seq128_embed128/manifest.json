@@ -1,0 +1,34 @@
+{
+  "id": "llama_block_zero_weight_seq128_embed128",
+  "op": "llama_block",
+  "level": "layer",
+  "tensors": {
+    "golden_output": {
+      "path": "golden_output.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 65536,
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 512
+    }
+  },
+  "attributes": {
+    "seq_len": 128,
+    "embed_dim": 128,
+    "key_dim": 64,
+    "value_dim": 64,
+    "n_head_q": 2,
+    "n_head_kv": 1,
+    "ffn_dim": 128,
+    "weights": "all projection and FFN weights are zero",
+    "expected": "two residual adds preserve input"
+  },
+  "generator": {
+    "tool": "golden/manual/generators/layer/gen_llama_block_zero_weight.py",
+    "created": "2026-05-19"
+  }
+}

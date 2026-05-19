@@ -1,0 +1,5 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 1
+cases:
+  - llama_block_zero_weight_1b_shape_seq128

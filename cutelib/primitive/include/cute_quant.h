@@ -14,7 +14,7 @@ static inline void cute_primitive_smoothquant_stage1_getscale_impl(const float *
                                                                    int rows,
                                                                    int cols)
 {
-    assert(cols % (64 * 4) == 0);
+    assert(cols % (16 * 4) == 0);
     assert(rows % 16 == 0);
     assert(rows <= 1024);
     assert(cols <= 32768);
@@ -50,7 +50,16 @@ static inline void cute_primitive_smoothquant_stage2_quant_impl(const float *inp
         size_t vl;
         size_t vl_0 = __riscv_vsetvl_e32m4(cols);
         vl = vl_0;
-        float id = 1.0f / scale[r];
+        float scale_r = scale[r];
+        if (scale_r == 0.0f) {
+            for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+                vl = __riscv_vsetvl_e8m1(avl);
+                vint8m1_t zeros = __riscv_vmv_v_x_i8m1(0, vl);
+                __riscv_vse8_v_i8m1(&output_row[c], zeros, vl);
+            }
+            continue;
+        }
+        float id = 1.0f / scale_r;
         for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
             vl = __riscv_vsetvl_e32m4(avl);
             vfloat32m4_t v_x = __riscv_vle32_v_f32m4(&row[c], vl);

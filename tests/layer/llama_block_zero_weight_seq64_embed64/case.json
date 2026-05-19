@@ -1,0 +1,24 @@
+{
+  "id": "llama_block_zero_weight_seq64_embed64",
+  "level": "layer",
+  "op_ref": "ops/layer/llama_block.yaml",
+  "build": {
+    "source": "test.c",
+    "target": "test.riscv"
+  },
+  "run": {
+    "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+    "trace_source": "run.out"
+  },
+  "golden": "golden/manual/layer/llama_block_zero_weight_seq64_embed64/manifest.json",
+  "verify": {
+    "mode": "return_code_and_bit_exact",
+    "tensors": [
+      {
+        "tensor": "golden_output",
+        "symbol": "output",
+        "float_tolerance_percent": 0.05
+      }
+    ]
+  }
+}

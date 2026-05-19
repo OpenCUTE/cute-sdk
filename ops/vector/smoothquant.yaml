@@ -71,7 +71,7 @@ constraints:
   - Q.dtype == I8
   - X.shape == Q.shape == [M, N]
   - scale_out.shape == [M]
-  - N % (64 * 4) == 0
+  - N % (16 * 4) == 0
   - M % 16 == 0
   - scale_in/scale_out must be valid when need_stage1 is false
   - No CUTE accelerator instruction may be issued by this op.

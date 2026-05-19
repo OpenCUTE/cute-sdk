@@ -1,0 +1,35 @@
+{
+  "id": "llama_block_zero_weight_1b_shape_seq128",
+  "op": "llama_block",
+  "level": "layer",
+  "tensors": {
+    "golden_output": {
+      "path": "golden_output.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1048576,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 8192
+    }
+  },
+  "attributes": {
+    "seq_len": 128,
+    "embed_dim": 2048,
+    "key_dim": 64,
+    "value_dim": 64,
+    "n_head_q": 32,
+    "n_head_kv": 8,
+    "ffn_dim": 8192,
+    "input": "deterministic nonzero generated in golden_llama_block_inputs.h",
+    "weights": "Q/K/O and FFN weights are zero; V uses deterministic nonzero weights",
+    "expected": "two residual adds preserve input"
+  },
+  "generator": {
+    "tool": "golden/manual/generators/layer/gen_llama_block_zero_weight.py",
+    "created": "2026-05-19"
+  }
+}

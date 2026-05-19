@@ -25,8 +25,11 @@ attention / layer 级语义补齐。
   fusion 已实现并验证。
 - LLaMA V layout 前置项已落地：`transpose_result=1` 的
   dequant+F16/BF16 store 已实现并验证，供 `proj_v` 使用。
-- 剩余主线：D2 真实 shape fusion 回归，D3 `cute_llama_block`
-  layer API 和端到端 case。
+- D3 first smoke 已落地：`cutelib/layer/include/cute_llama.h`
+  提供 `cute_llama_block`，`tests/llama_layer.yaml` 中的
+  `llama_block_zero_weight_seq128_embed64` 已通过 memverify。
+- 剩余主线：D2 真实 shape fusion 回归，以及 D3 的 1B shape /
+  cutetest dump 对齐。
 
 ---
 
@@ -71,18 +74,18 @@ attention / layer 级语义补齐。
 
 | 路径 | 当前状态 | 缺口 |
 |---|---|---|
-| RMSNorm / RMSNorm with scale | primitive 已测 | 需要 layer 级真实 buffer 接线 |
-| SmoothQuant stage1=true | primitive 已测 | 需要真实 shape 回归 |
-| SmoothQuant stage1=false | API 已有 | 需要补独立 case |
+| RMSNorm / RMSNorm with scale | primitive 已测；layer smoke 已接线 | 需要 1B shape 回归 |
+| SmoothQuant stage1=true | primitive 已测；layer smoke 已接线 | 需要 1B shape 回归 |
+| SmoothQuant stage1=false | 独立 case 已测；layer smoke 已接线 | 需要 1B shape 回归 |
 | Q/K projection + RoPE | fusion 已测 `N=64` | 需要真实 shape/head layout 回归 |
 | V projection + bf16cvt | fusion 已测 | 需要真实 shape/head layout 回归 |
-| QK scores + masked softmax | fusion 已测 `N=64` | **缺 `N=128` 整行 softmax / row-block fusion** |
-| softmax x V context matmul | tensor 能力疑似已有 | **缺 attention context 专项 case** |
+| QK scores + masked softmax | fusion 已测 `N=64` 和 `N=128` row-block | 需要多 head / 1B shape 回归 |
+| softmax x V context matmul | attention context case 已测 | 需要多 head / 1B shape 回归 |
 | O projection + resadd | fusion 已测小 shape | 需要真实 shape回归 |
 | FFN gate + SiLU | fusion 已测小 shape | 需要 `N=8192` 回归 |
 | FFN up + Hadamard + absmax | fusion 已测小 shape | 需要 `N=8192` 多 tile absmax 回归 |
 | FFN down + resadd | fusion 已测小 shape | 需要 `K=8192` 回归 |
-| layer `cute_llama_block` | 未实现 | **缺 L4 layer API 与端到端 case** |
+| layer `cute_llama_block` | first layer API + seq128/embed64 smoke 已测 | **缺 1B shape 端到端 case** |
 
 ---
 
@@ -346,7 +349,7 @@ cases:
 cutelib/layer/include/
     cute_llama.h
 tests/layer/
-    llama_block_1b_seq128/
+    llama_block_zero_weight_seq128_embed64/
         case.json
         test.c
 tests/llama_layer.yaml
@@ -362,7 +365,12 @@ target_include_directories(cutelib_layer INTERFACE
 target_link_libraries(cutelib_layer INTERFACE cutelib_fusion)
 ```
 
-### 7.2 API 草案
+当前已落地的第一版 smoke 使用 `SEQ_LEN=128, EMBED_DIM=64,
+N_HEAD_Q=1, N_HEAD_KV=1, FFN_DIM=64`。Q/K/O/FFN 权重置零，
+V 权重使用 deterministic nonzero pattern，让 attention context
+真实执行；最终两个 residual add 仍保持输出等于输入。
+
+### 7.2 API 第一版
 
 ```c
 typedef struct {
@@ -397,16 +405,34 @@ typedef struct {
 
     const float *rope_theta;
     const int8_t *causal_mask;
-
-    void *scratch0;
-    void *scratch1;
-    void *scratch2;
-    void *scratch3;
-    void *workspace;
-    size_t workspace_bytes;
 } cute_llama_block_config_t;
 
+typedef struct {
+    float *attn_norm_f32;
+    int8_t *attn_norm_q8;
+    float *attn_norm_scale;
+    uint16_t *q_f16;
+    uint16_t *k_f16;
+    uint16_t *v_f16_t;
+    uint16_t *scores_f16;
+    float *attn_context_f32;
+    int8_t *attn_q8;
+    float *attn_scale;
+    float *proj_o_f32;
+    float *ffn_norm_f32;
+    int8_t *ffn_norm_q8;
+    float *ffn_norm_scale;
+    float *ffn_gate_f32;
+    float *ffn_up_f32;
+    int8_t *ffn_up_q8;
+    float *ffn_up_scale;
+    void *scratch0;
+    void *scratch1;
+    void *zero_bias;
+} cute_llama_block_workspace_t;
+
 void cute_llama_block(const cute_llama_block_config_t *cfg,
+                      cute_llama_block_workspace_t *ws,
                       const float *input,
                       float *output);
 ```
@@ -490,12 +516,13 @@ ffn_up_scale                      [128] F32
 
 ## 9. Done Criteria
 
-1. `fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64` 三 variant 通过。
-2. `attention_context_f16_m128_n64_k128` 三 variant 通过。
-3. SmoothQuant `need_stage1=false` 独立 case 通过。
-4. 至少一组 LLaMA projection、attention、FFN 大 shape fusion case 通过。
-5. `cutelib/layer/include/cute_llama.h` 提供 `cute_llama_block`。
-6. `tests/layer/llama_block_1b_seq128` 可以完成单层 forward 并通过 memverify。
+1. [x] `fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64` 三 variant 通过。
+2. [x] `attention_context_f16_m128_n64_k128` 三 variant 通过。
+3. [x] SmoothQuant `need_stage1=false` 独立 case 通过。
+4. [ ] 至少一组 LLaMA projection、attention、FFN 大 shape fusion case 通过。
+5. [x] `cutelib/layer/include/cute_llama.h` 提供 `cute_llama_block`。
+6. [x] `tests/layer/llama_block_zero_weight_seq128_embed64` 可以完成单层 forward 并通过 memverify。
+7. [ ] `tests/layer/llama_block_1b_seq128` 使用 cutetest dump 完成单层 forward 并通过 memverify。
 
 ---
 
