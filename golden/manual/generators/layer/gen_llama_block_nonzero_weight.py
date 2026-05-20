@@ -297,6 +297,18 @@ def tensor_desc(path: str, dtype: str, element_bits: int,
     }
 
 
+def emit_i8_bin(path: Path, array: np.ndarray) -> None:
+    path.write_bytes(np.asarray(array, dtype=np.int8).tobytes())
+
+
+def emit_f16_bin(path: Path, array: np.ndarray) -> None:
+    path.write_bytes(np.asarray(array, dtype="<f2").tobytes())
+
+
+def emit_f32_bin(path: Path, array: np.ndarray) -> None:
+    path.write_bytes(np.asarray(array, dtype="<f4").tobytes())
+
+
 def emit_header(attn_weight: np.ndarray, ffn_weight: np.ndarray) -> None:
     mask = causal_mask()
     guard = "GOLDEN_LLAMA_BLOCK_NONZERO_WEIGHT_1B_SHAPE_SEQ128_INPUTS_H"
@@ -323,6 +335,19 @@ extern const int8_t golden_llama_proj_o_weight[{EMBED_DIM * EMBED_DIM}];
 extern const int8_t golden_llama_ffn_gate_weight[{FFN_DIM * EMBED_DIM}];
 extern const int8_t golden_llama_ffn_up_weight[{FFN_DIM * EMBED_DIM}];
 extern const int8_t golden_llama_ffn_down_weight[{EMBED_DIM * FFN_DIM}];
+extern const int8_t golden_llama_attn_norm_q8[{SEQ_LEN * EMBED_DIM}];
+extern const float golden_llama_attn_norm_scale[{SEQ_LEN}];
+extern const uint16_t golden_llama_q_f16[{SEQ_LEN * N_HEAD_Q * KEY_DIM}];
+extern const uint16_t golden_llama_k_f16[{SEQ_LEN * N_HEAD_KV * KEY_DIM}];
+extern const uint16_t golden_llama_v_f16_t[{N_HEAD_KV * VALUE_DIM * SEQ_LEN}];
+extern const uint16_t golden_llama_scores_head0_f16[{SEQ_LEN * SEQ_LEN}];
+extern const float golden_llama_proj_o_f32[{SEQ_LEN * EMBED_DIM}];
+extern const int8_t golden_llama_ffn_norm_q8[{SEQ_LEN * EMBED_DIM}];
+extern const float golden_llama_ffn_norm_scale[{SEQ_LEN}];
+extern const float golden_llama_ffn_gate_f32[{SEQ_LEN * FFN_DIM}];
+extern const float golden_llama_ffn_up_f32[{SEQ_LEN * FFN_DIM}];
+extern const float golden_llama_ffn_up_row_scale[{SEQ_LEN}];
+extern const int8_t golden_llama_ffn_up_q8[{SEQ_LEN * FFN_DIM}];
 
 static const float golden_llama_attn_norm_weight[{EMBED_DIM}]
     __attribute__((aligned(64))) = {{
@@ -383,7 +408,98 @@ def emit_manifest() -> None:
                 32,
                 [SEQ_LEN, EMBED_DIM],
                 EMBED_DIM * 4,
-            )
+            ),
+            "golden_attn_norm_q8": tensor_desc(
+                "attn_norm_q8.bin",
+                "I8",
+                8,
+                [SEQ_LEN, EMBED_DIM],
+                EMBED_DIM,
+            ),
+            "golden_attn_norm_scale": tensor_desc(
+                "attn_norm_scale.bin",
+                "F32",
+                32,
+                [SEQ_LEN],
+                SEQ_LEN * 4,
+            ),
+            "golden_q_f16": tensor_desc(
+                "q_f16.bin",
+                "F16",
+                16,
+                [SEQ_LEN, N_HEAD_Q * KEY_DIM],
+                N_HEAD_Q * KEY_DIM * 2,
+            ),
+            "golden_k_f16": tensor_desc(
+                "k_f16.bin",
+                "F16",
+                16,
+                [SEQ_LEN, N_HEAD_KV * KEY_DIM],
+                N_HEAD_KV * KEY_DIM * 2,
+            ),
+            "golden_v_f16_t": tensor_desc(
+                "v_f16_t.bin",
+                "F16",
+                16,
+                [N_HEAD_KV * VALUE_DIM, SEQ_LEN],
+                SEQ_LEN * 2,
+            ),
+            "golden_scores_head0_f16": tensor_desc(
+                "scores_head0_f16.bin",
+                "F16",
+                16,
+                [SEQ_LEN, SEQ_LEN],
+                SEQ_LEN * 2,
+            ),
+            "golden_proj_o_f32": tensor_desc(
+                "proj_o_f32.bin",
+                "F32",
+                32,
+                [SEQ_LEN, EMBED_DIM],
+                EMBED_DIM * 4,
+            ),
+            "golden_ffn_norm_q8": tensor_desc(
+                "ffn_norm_q8.bin",
+                "I8",
+                8,
+                [SEQ_LEN, EMBED_DIM],
+                EMBED_DIM,
+            ),
+            "golden_ffn_norm_scale": tensor_desc(
+                "ffn_norm_scale.bin",
+                "F32",
+                32,
+                [SEQ_LEN],
+                SEQ_LEN * 4,
+            ),
+            "golden_ffn_gate_f32": tensor_desc(
+                "ffn_gate_f32.bin",
+                "F32",
+                32,
+                [SEQ_LEN, FFN_DIM],
+                FFN_DIM * 4,
+            ),
+            "golden_ffn_up_f32": tensor_desc(
+                "ffn_up_f32.bin",
+                "F32",
+                32,
+                [SEQ_LEN, FFN_DIM],
+                FFN_DIM * 4,
+            ),
+            "golden_ffn_up_row_scale": tensor_desc(
+                "ffn_up_row_scale.bin",
+                "F32",
+                32,
+                [SEQ_LEN],
+                SEQ_LEN * 4,
+            ),
+            "golden_ffn_up_q8": tensor_desc(
+                "ffn_up_q8.bin",
+                "I8",
+                8,
+                [SEQ_LEN, FFN_DIM],
+                FFN_DIM,
+            ),
         },
         "attributes": {
             "seq_len": SEQ_LEN,
@@ -419,6 +535,8 @@ def main() -> int:
 
     attn_norm_f32, attn_norm_scale = rmsnorm_with_scale(input_data, attn_weight)
     attn_norm_q8 = smoothquant_stage2(attn_norm_f32, attn_norm_scale)
+    emit_i8_bin(OUT_ROOT / "attn_norm_q8.bin", attn_norm_q8)
+    emit_f32_bin(OUT_ROOT / "attn_norm_scale.bin", attn_norm_scale)
 
     q_acc = grouped_matmul_i8(attn_norm_q8, N_HEAD_Q * KEY_DIM, WEIGHTS["proj_q"][2])
     k_acc = grouped_matmul_i8(attn_norm_q8, N_HEAD_KV * KEY_DIM, WEIGHTS["proj_k"][2])
@@ -427,10 +545,13 @@ def main() -> int:
     q_f16 = apply_rope(dequant(q_acc, attn_norm_scale, PROJ_Q_SCALE), N_HEAD_Q * KEY_DIM)
     k_f16 = apply_rope(dequant(k_acc, attn_norm_scale, PROJ_K_SCALE), N_HEAD_KV * KEY_DIM)
     v_f16 = to_f16_f32(dequant(v_acc, attn_norm_scale, PROJ_V_SCALE))
+    emit_f16_bin(OUT_ROOT / "q_f16.bin", q_f16)
+    emit_f16_bin(OUT_ROOT / "k_f16.bin", k_f16)
     v_f16_t = np.transpose(
         v_f16.reshape(SEQ_LEN, N_HEAD_KV, VALUE_DIM),
         (1, 2, 0),
     ).copy()
+    emit_f16_bin(OUT_ROOT / "v_f16_t.bin", v_f16_t)
 
     scores_f16 = np.empty((N_HEAD_Q, SEQ_LEN, SEQ_LEN), dtype=np.float32)
     attn_context_f32 = np.empty((SEQ_LEN, EMBED_DIM), dtype=np.float32)
@@ -443,14 +564,18 @@ def main() -> int:
         scores_f16[h] = probs
         ctx = f32a(probs @ v_f16_t[kv_h].T)
         attn_context_f32[:, h * VALUE_DIM:(h + 1) * VALUE_DIM] = ctx
+    emit_f16_bin(OUT_ROOT / "scores_head0_f16.bin", scores_f16[0])
 
     attn_q8, attn_scale = smoothquant(attn_context_f32)
     proj_o_acc = grouped_matmul_i8(attn_q8, EMBED_DIM, WEIGHTS["proj_o"][2])
     proj_o_deq = dequant(proj_o_acc, attn_scale, PROJ_O_SCALE)
     proj_o_f32 = f32a(proj_o_deq + input_data)
+    emit_f32_bin(OUT_ROOT / "proj_o_f32.bin", proj_o_f32)
 
     ffn_norm_f32, ffn_norm_scale = rmsnorm_with_scale(proj_o_f32, ffn_weight)
     ffn_norm_q8 = smoothquant_stage2(ffn_norm_f32, ffn_norm_scale)
+    emit_i8_bin(OUT_ROOT / "ffn_norm_q8.bin", ffn_norm_q8)
+    emit_f32_bin(OUT_ROOT / "ffn_norm_scale.bin", ffn_norm_scale)
 
     gate_acc = grouped_matmul_i8(ffn_norm_q8, FFN_DIM, WEIGHTS["ffn_gate"][2])
     up_acc = grouped_matmul_i8(ffn_norm_q8, FFN_DIM, WEIGHTS["ffn_up"][2])
@@ -458,12 +583,16 @@ def main() -> int:
     ffn_up_f32 = f32a(dequant(up_acc, ffn_norm_scale, FFN_UP_SCALE) * ffn_gate_f32)
     ffn_up_scale = f32a(np.max(np.abs(ffn_up_f32), axis=1) / np.float32(127.0))
     ffn_up_q8 = smoothquant_stage2(ffn_up_f32, ffn_up_scale)
+    emit_f32_bin(OUT_ROOT / "ffn_gate_f32.bin", ffn_gate_f32)
+    emit_f32_bin(OUT_ROOT / "ffn_up_f32.bin", ffn_up_f32)
+    emit_f32_bin(OUT_ROOT / "ffn_up_row_scale.bin", ffn_up_scale)
+    emit_i8_bin(OUT_ROOT / "ffn_up_q8.bin", ffn_up_q8)
 
     down_acc = grouped_matmul_i8(ffn_up_q8, EMBED_DIM, WEIGHTS["ffn_down"][2])
     down_deq = dequant(down_acc, ffn_up_scale, FFN_DOWN_SCALE)
     output = f32a(down_deq + proj_o_f32)
 
-    (OUT_ROOT / "golden_output.bin").write_bytes(output.astype("<f4").tobytes())
+    emit_f32_bin(OUT_ROOT / "golden_output.bin", output)
     emit_header(attn_weight, ffn_weight)
     emit_manifest()
 

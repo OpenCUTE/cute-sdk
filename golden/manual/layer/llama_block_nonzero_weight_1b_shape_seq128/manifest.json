@@ -14,6 +14,159 @@
         2048
       ],
       "stride_bytes": 8192
+    },
+    "golden_attn_norm_q8": {
+      "path": "attn_norm_q8.bin",
+      "dtype": "I8",
+      "element_bits": 8,
+      "total_bytes": 262144,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 2048
+    },
+    "golden_attn_norm_scale": {
+      "path": "attn_norm_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 512,
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 512
+    },
+    "golden_q_f16": {
+      "path": "q_f16.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 524288,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 4096
+    },
+    "golden_k_f16": {
+      "path": "k_f16.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 131072,
+      "layout": "row_major",
+      "shape": [
+        128,
+        512
+      ],
+      "stride_bytes": 1024
+    },
+    "golden_v_f16_t": {
+      "path": "v_f16_t.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 131072,
+      "layout": "row_major",
+      "shape": [
+        512,
+        128
+      ],
+      "stride_bytes": 256
+    },
+    "golden_scores_head0_f16": {
+      "path": "scores_head0_f16.bin",
+      "dtype": "F16",
+      "element_bits": 16,
+      "total_bytes": 32768,
+      "layout": "row_major",
+      "shape": [
+        128,
+        128
+      ],
+      "stride_bytes": 256
+    },
+    "golden_proj_o_f32": {
+      "path": "proj_o_f32.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1048576,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 8192
+    },
+    "golden_ffn_norm_q8": {
+      "path": "ffn_norm_q8.bin",
+      "dtype": "I8",
+      "element_bits": 8,
+      "total_bytes": 262144,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 2048
+    },
+    "golden_ffn_norm_scale": {
+      "path": "ffn_norm_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 512,
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 512
+    },
+    "golden_ffn_gate_f32": {
+      "path": "ffn_gate_f32.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 4194304,
+      "layout": "row_major",
+      "shape": [
+        128,
+        8192
+      ],
+      "stride_bytes": 32768
+    },
+    "golden_ffn_up_f32": {
+      "path": "ffn_up_f32.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 4194304,
+      "layout": "row_major",
+      "shape": [
+        128,
+        8192
+      ],
+      "stride_bytes": 32768
+    },
+    "golden_ffn_up_row_scale": {
+      "path": "ffn_up_row_scale.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 512,
+      "layout": "row_major",
+      "shape": [
+        128
+      ],
+      "stride_bytes": 512
+    },
+    "golden_ffn_up_q8": {
+      "path": "ffn_up_q8.bin",
+      "dtype": "I8",
+      "element_bits": 8,
+      "total_bytes": 1048576,
+      "layout": "row_major",
+      "shape": [
+        128,
+        8192
+      ],
+      "stride_bytes": 8192
     }
   },
   "attributes": {

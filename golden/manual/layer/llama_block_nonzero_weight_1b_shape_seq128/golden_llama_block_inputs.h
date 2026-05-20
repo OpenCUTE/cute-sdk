@@ -21,6 +21,19 @@ extern const int8_t golden_llama_proj_o_weight[4194304];
 extern const int8_t golden_llama_ffn_gate_weight[16777216];
 extern const int8_t golden_llama_ffn_up_weight[16777216];
 extern const int8_t golden_llama_ffn_down_weight[16777216];
+extern const int8_t golden_llama_attn_norm_q8[262144];
+extern const float golden_llama_attn_norm_scale[128];
+extern const uint16_t golden_llama_q_f16[262144];
+extern const uint16_t golden_llama_k_f16[65536];
+extern const uint16_t golden_llama_v_f16_t[65536];
+extern const uint16_t golden_llama_scores_head0_f16[16384];
+extern const float golden_llama_proj_o_f32[262144];
+extern const int8_t golden_llama_ffn_norm_q8[262144];
+extern const float golden_llama_ffn_norm_scale[128];
+extern const float golden_llama_ffn_gate_f32[1048576];
+extern const float golden_llama_ffn_up_f32[1048576];
+extern const float golden_llama_ffn_up_row_scale[128];
+extern const int8_t golden_llama_ffn_up_q8[1048576];
 
 static const float golden_llama_attn_norm_weight[2048]
     __attribute__((aligned(64))) = {

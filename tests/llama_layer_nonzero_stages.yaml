@@ -1,0 +1,11 @@
+hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
+build: false
+parallel: 7
+cases:
+  - llama_stage_proj_q_nonzero_1b_shape_seq128
+  - llama_stage_proj_k_nonzero_1b_shape_seq128
+  - llama_stage_proj_v_nonzero_1b_shape_seq128
+  - llama_stage_score_head0_nonzero_1b_shape_seq128
+  - llama_stage_ffn_gate_nonzero_1b_shape_seq128
+  - llama_stage_ffn_up_nonzero_1b_shape_seq128
+  - llama_stage_ffn_down_nonzero_1b_shape_seq128
