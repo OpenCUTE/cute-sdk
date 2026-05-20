@@ -326,13 +326,13 @@ def emit_softmax(case_id: str, output: list[float],
                  rows: int, cols: int, k: int) -> None:
     case_dir = OUT_ROOT / case_id
     case_dir.mkdir(parents=True, exist_ok=True)
-    (case_dir / "golden_output_f16.bin").write_bytes(pack_bf16_trunc(output))
+    (case_dir / "golden_output_bf16.bin").write_bytes(pack_bf16_trunc(output))
     write_manifest(
         case_dir,
         case_id,
         {
-            "golden_output_f16": tensor_desc(
-                "golden_output_f16.bin", "BF16", 16, [rows, cols], cols * 2
+            "golden_output_bf16": tensor_desc(
+                "golden_output_bf16.bin", "BF16", 16, [rows, cols], cols * 2
             )
         },
         {

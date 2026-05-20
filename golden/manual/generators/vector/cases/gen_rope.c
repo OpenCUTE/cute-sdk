@@ -52,20 +52,20 @@ int main(void) {
     float input[TOTAL];
     float output_f32[TOTAL];
     float rope_theta[HALF_DIM];
-    uint16_t output_f16[TOTAL];
+    uint16_t output_bf16[TOTAL];
 
     memset(input, 0, sizeof(input));
     memset(output_f32, 0, sizeof(output_f32));
-    memset(output_f16, 0, sizeof(output_f16));
+    memset(output_bf16, 0, sizeof(output_bf16));
 
     cute_fill_rope_input(input, TOTAL);
     cute_fill_rope_theta(rope_theta, HALF_DIM);
 
     __gloden_rope(input, output_f32, rope_theta, ROPE_POS, 1, GOLDEN_N_HEAD, GOLDEN_M, GOLDEN_HEAD_DIM);
-    __gloden_cvrtbf16(output_f32, output_f16, GOLDEN_M, GOLDEN_HEAD_DIM);
+    __gloden_cvrtbf16(output_f32, output_bf16, GOLDEN_M, GOLDEN_HEAD_DIM);
 
-    printf("#ifndef GOLDEN_ROPE_M%d_HEAD%d_POS%d_F16_H\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
-    printf("#define GOLDEN_ROPE_M%d_HEAD%d_POS%d_F16_H\n\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
+    printf("#ifndef GOLDEN_ROPE_M%d_HEAD%d_POS%d_BF16_H\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
+    printf("#define GOLDEN_ROPE_M%d_HEAD%d_POS%d_BF16_H\n\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
     printf("#include <stdint.h>\n\n");
     printf("#define GOLDEN_ROPE_M %d\n", GOLDEN_M);
     printf("#define GOLDEN_ROPE_HEAD_DIM %d\n", GOLDEN_HEAD_DIM);
@@ -75,8 +75,8 @@ int main(void) {
     printf("\n");
     print_f32_array("golden_rope_theta", rope_theta, HALF_DIM);
     printf("\n");
-    print_u16_array("golden_rope_output_f16", output_f16, TOTAL);
+    print_u16_array("golden_rope_output_bf16", output_bf16, TOTAL);
 
-    printf("\n#endif /* GOLDEN_ROPE_M%d_HEAD%d_POS%d_F16_H */\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
+    printf("\n#endif /* GOLDEN_ROPE_M%d_HEAD%d_POS%d_BF16_H */\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
     return 0;
 }

@@ -89,7 +89,7 @@ cases:
       GOLDEN_M: 64
       GOLDEN_N: 128
 
-  - name: rope_pos0
+  - name: rope_bf16_pos0
     source: gen_rope.c
     params:
       GOLDEN_M: 64
@@ -97,7 +97,7 @@ cases:
       GOLDEN_N_HEAD: 1
       ROPE_POS: 0
 
-  - name: rope_pos17
+  - name: rope_bf16_pos17
     source: gen_rope.c
     params:
       GOLDEN_M: 64
@@ -105,7 +105,7 @@ cases:
       GOLDEN_N_HEAD: 1
       ROPE_POS: 17
 
-  - name: masked_softmax
+  - name: masked_softmax_bf16
     source: gen_masked_softmax.c
     params:
       GOLDEN_M: 64

@@ -1,5 +1,5 @@
-#ifndef GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_F16_H
-#define GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_F16_H
+#ifndef GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_BF16_H
+#define GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_BF16_H
 
 #include <stdint.h>
 
@@ -2124,7 +2124,7 @@ static const uint8_t golden_softmax_causal_mask[1024] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-static const uint16_t golden_softmax_output_f16[8192] = {
+static const uint16_t golden_softmax_output_bf16[8192] = {
     0x3f80, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
@@ -3151,4 +3151,4 @@ static const uint16_t golden_softmax_output_f16[8192] = {
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000
 };
 
-#endif /* GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_F16_H */
+#endif /* GOLDEN_MASKED_SOFTMAX_M64_N128_CAUSAL_BF16_H */

@@ -177,10 +177,10 @@ int main(void)
     cute_llama_block_config_t cfg = stage_base_config();
 
     cute_llama_block_workspace_t ws = stage_workspace(&zero_bias_placeholder);
-    cute_tensor_t q = {(void *)golden_llama_q_f16,
+    cute_tensor_t q = {(void *)golden_llama_q_bf16,
                        (uint64_t)TEST_Q_DIM * sizeof(uint16_t),
                        TEST_SEQ_LEN, TEST_KEY_DIM, CUTEDataTypeBF16BF16F32};
-    cute_tensor_t k = {(void *)golden_llama_k_f16,
+    cute_tensor_t k = {(void *)golden_llama_k_bf16,
                        (uint64_t)TEST_KV_DIM * sizeof(uint16_t),
                        TEST_KEY_DIM, TEST_SEQ_LEN, CUTEDataTypeBF16BF16F32};
     cute_tensor_t bias = {NULL, 0, TEST_SEQ_LEN, TEST_SEQ_LEN,

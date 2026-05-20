@@ -340,7 +340,7 @@ golden：
 case.json：
 
 - `golden`: `golden/manual/fusion/matmul_dequant_rope_bf16cvt_m128_n64/manifest.json`
-- `verify.tensors`: 只验 `golden_output_f16 -> output`
+- `verify.tensors`: 只验 `golden_output_bf16 -> output`
 - `float_tolerance_percent`: 建议 `0.5`
 
 验收：
@@ -484,7 +484,7 @@ golden：
 
 case.json：
 
-- `verify.tensors`: `golden_output_f16 -> output`
+- `verify.tensors`: `golden_output_bf16 -> output`
 - `float_tolerance_percent`: 建议 `0.5`，如 softmax 近似差异较小可收紧。
 
 后续 N=128 版本：

@@ -59,8 +59,8 @@ def make_test_case_id(golden_case_id):
 def is_bf16_output_case(case_name):
     return (
         "bf16cvt" in case_name
-        or case_name.startswith("rope_pos")
-        or case_name == "masked_softmax"
+        or case_name.startswith("rope_bf16_pos")
+        or case_name == "masked_softmax_bf16"
     )
 
 

@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "cutelib/primitive/include/cute_sequence.h"
-#include "golden/manual/vector/masked_softmax_m64_n128/golden_masked_softmax.h"
+#include "golden/manual/vector/masked_softmax_bf16_m64_n128/golden_masked_softmax_bf16.h"
 #include "tests/primitive/primitive_test_utils.h"
 
 static uint16_t output[GOLDEN_SOFTMAX_M * GOLDEN_SOFTMAX_N] CUTE_TEST_ALIGN;

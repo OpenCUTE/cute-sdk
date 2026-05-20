@@ -227,7 +227,7 @@ tests/fusion/fusion_matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64/
     test_pipeline.c
 golden/manual/fusion/matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64/
     manifest.json
-    golden_output_f16.bin
+    golden_output_bf16.bin
 ```
 
 输入：
@@ -239,7 +239,7 @@ golden/manual/fusion/matmul_masked_softmax_kvscale_bf16cvt_m128_n128_k64/
 
 验证：
 
-- `golden_output_f16 -> output`
+- `golden_output_bf16 -> output`
 - F16/BF16 类输出 `float_tolerance_percent = 0.5`
 - 如果 generator 和实现完全对齐，可接受 bit exact。
 
@@ -411,10 +411,10 @@ typedef struct {
     float *attn_norm_f32;
     int8_t *attn_norm_q8;
     float *attn_norm_scale;
-    uint16_t *q_f16;
-    uint16_t *k_f16;
-    uint16_t *v_f16_t;
-    uint16_t *scores_f16;
+    uint16_t *q_bf16;
+    uint16_t *k_bf16;
+    uint16_t *v_bf16_t;
+    uint16_t *scores_bf16;
     float *attn_context_f32;
     int8_t *attn_q8;
     float *attn_scale;

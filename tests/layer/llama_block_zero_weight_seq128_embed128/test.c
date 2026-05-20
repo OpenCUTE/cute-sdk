@@ -40,10 +40,10 @@ static int8_t causal_mask[TEST_SEQ_LEN * ((TEST_MAX_CTX_LEN + 7) / 8)] CUTE_TEST
 static float attn_norm_f32[TEST_SEQ_LEN][TEST_EMBED_DIM] CUTE_TEST_ALIGN;
 static int8_t attn_norm_q8[TEST_SEQ_LEN][TEST_EMBED_DIM] CUTE_TEST_ALIGN;
 static float attn_norm_scale[TEST_SEQ_LEN] CUTE_TEST_ALIGN;
-static uint16_t q_f16[TEST_SEQ_LEN][TEST_N_HEAD_Q * TEST_KEY_DIM] CUTE_TEST_ALIGN;
-static uint16_t k_f16[TEST_SEQ_LEN][TEST_N_HEAD_KV * TEST_KEY_DIM] CUTE_TEST_ALIGN;
-static uint16_t v_f16_t[TEST_N_HEAD_KV * TEST_VALUE_DIM][TEST_SEQ_LEN] CUTE_TEST_ALIGN;
-static uint16_t scores_f16[TEST_N_HEAD_Q][TEST_SEQ_LEN][TEST_SEQ_LEN] CUTE_TEST_ALIGN;
+static uint16_t q_bf16[TEST_SEQ_LEN][TEST_N_HEAD_Q * TEST_KEY_DIM] CUTE_TEST_ALIGN;
+static uint16_t k_bf16[TEST_SEQ_LEN][TEST_N_HEAD_KV * TEST_KEY_DIM] CUTE_TEST_ALIGN;
+static uint16_t v_bf16_t[TEST_N_HEAD_KV * TEST_VALUE_DIM][TEST_SEQ_LEN] CUTE_TEST_ALIGN;
+static uint16_t scores_bf16[TEST_N_HEAD_Q][TEST_SEQ_LEN][TEST_SEQ_LEN] CUTE_TEST_ALIGN;
 static float attn_context_f32[TEST_SEQ_LEN][TEST_EMBED_DIM] CUTE_TEST_ALIGN;
 static int8_t attn_q8[TEST_SEQ_LEN][TEST_EMBED_DIM] CUTE_TEST_ALIGN;
 static float attn_scale[TEST_SEQ_LEN] CUTE_TEST_ALIGN;
@@ -134,10 +134,10 @@ int main(void)
         .attn_norm_f32 = &attn_norm_f32[0][0],
         .attn_norm_q8 = &attn_norm_q8[0][0],
         .attn_norm_scale = attn_norm_scale,
-        .q_f16 = &q_f16[0][0],
-        .k_f16 = &k_f16[0][0],
-        .v_f16_t = &v_f16_t[0][0],
-        .scores_f16 = &scores_f16[0][0][0],
+        .q_bf16 = &q_bf16[0][0],
+        .k_bf16 = &k_bf16[0][0],
+        .v_bf16_t = &v_bf16_t[0][0],
+        .scores_bf16 = &scores_bf16[0][0][0],
         .attn_context_f32 = &attn_context_f32[0][0],
         .attn_q8 = &attn_q8[0][0],
         .attn_scale = attn_scale,

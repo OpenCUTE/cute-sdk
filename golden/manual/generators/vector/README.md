@@ -63,9 +63,9 @@ C 源码中的尺寸宏（`GOLDEN_M`、`GOLDEN_N` 等）通过 `-D` 传入，不
 | dequant_f16 | dequant I32→F16 | M=64, N=64 | F16 (uint16) |
 | resadd | element-wise add | M=64, N=64 | F32 |
 | hadamard | element-wise mul + row_absmax | M=64, N=128 | F32 |
-| rope_pos0 | RoPE position=0 | M=64, HEAD_DIM=64 | F16 (uint16) |
-| rope_pos17 | RoPE position=17 | M=64, HEAD_DIM=64 | F16 (uint16) |
-| masked_softmax | causal softmax | M=64, N=128 | F16 (uint16) |
+| rope_bf16_pos0 | RoPE position=0 | M=64, HEAD_DIM=64 | BF16 (uint16) |
+| rope_bf16_pos17 | RoPE position=17 | M=64, HEAD_DIM=64 | BF16 (uint16) |
+| masked_softmax_bf16 | causal softmax | M=64, N=128 | BF16 (uint16) |
 | smoothquant | SmoothQuant F32→I8 | M=128, K=2048 | I8 + scale F32 |
 | rmsnorm | RMSNorm | BATCH=1, SEQ=128, DIM=2048 | F32 |
 | rmsnorm_scale | RMSNorm + per_token_scale | BATCH=1, SEQ=128, DIM=2048 | F32 + scale F32 |

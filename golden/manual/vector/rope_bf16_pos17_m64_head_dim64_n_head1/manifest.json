@@ -1,55 +1,55 @@
 {
-  "id": "masked_softmax_m64_n128",
-  "op": "masked_softmax",
+  "id": "rope_bf16_pos17_m64_head_dim64_n_head1",
+  "op": "rope_bf16_pos17",
   "level": "primitive",
-  "op_ref": "ops/vector/masked_softmax.yaml",
+  "op_ref": "ops/vector/rope_bf16_pos17.yaml",
   "tensors": {
-    "golden_softmax_input": {
-      "path": "golden_softmax_input.bin",
+    "golden_rope_input": {
+      "path": "golden_rope_input.bin",
       "dtype": "F32",
       "element_bits": 32,
-      "total_bytes": 32768,
-      "layout": "row_major",
-      "shape": [
-        64,
-        128
-      ],
-      "stride_bytes": 512
-    },
-    "golden_softmax_causal_mask": {
-      "path": "golden_softmax_causal_mask.bin",
-      "dtype": "U1_PACKED",
-      "element_bits": 8,
-      "total_bytes": 1024,
-      "layout": "row_major",
-      "shape": [
-        1024
-      ],
-      "stride_bytes": 1024
-    },
-    "golden_softmax_output_f16": {
-      "path": "golden_softmax_output_f16.bin",
-      "dtype": "BF16",
-      "element_bits": 16,
       "total_bytes": 16384,
       "layout": "row_major",
       "shape": [
-        64,
-        128
+        4096
       ],
-      "stride_bytes": 256
+      "stride_bytes": 16384
+    },
+    "golden_rope_theta": {
+      "path": "golden_rope_theta.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 128,
+      "layout": "row_major",
+      "shape": [
+        32
+      ],
+      "stride_bytes": 128
+    },
+    "golden_rope_output_bf16": {
+      "path": "golden_rope_output_bf16.bin",
+      "dtype": "BF16",
+      "element_bits": 16,
+      "total_bytes": 8192,
+      "layout": "row_major",
+      "shape": [
+        4096
+      ],
+      "stride_bytes": 8192
     }
   },
   "attributes": {
     "m": 64,
-    "n": 128
+    "head_dim": 64,
+    "n_head": 1,
+    "rope_pos": 17
   },
   "verify": {
     "mode": "bit_exact",
     "tensors": [
-      "golden_softmax_input",
-      "golden_softmax_causal_mask",
-      "golden_softmax_output_f16"
+      "golden_rope_input",
+      "golden_rope_theta",
+      "golden_rope_output_bf16"
     ]
   },
   "generator": {
@@ -62,6 +62,6 @@
     "created": "2026-05-20"
   },
   "files": {
-    "header": "golden_masked_softmax.h"
+    "header": "golden_rope_bf16_pos17.h"
   }
 }

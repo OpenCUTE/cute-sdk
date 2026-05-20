@@ -56,23 +56,23 @@ static void print_u8_array(const char *name, const uint8_t *data, int n) {
 int main(void) {
     float input[TOTAL], output_f32[TOTAL];
     uint8_t mask[(GOLDEN_M * GOLDEN_N + 7) / 8];
-    uint16_t output_f16[TOTAL];
+    uint16_t output_bf16[TOTAL];
 
     memset(input, 0, sizeof(input));
     memset(output_f32, 0, sizeof(output_f32));
     memset(mask, 0, sizeof(mask));
-    memset(output_f16, 0, sizeof(output_f16));
+    memset(output_bf16, 0, sizeof(output_bf16));
 
     cute_fill_softmax_input(input, TOTAL);
     cute_fill_causal_mask(mask, GOLDEN_M, GOLDEN_N);
 
     __gloden_softmax(input, output_f32, mask, GOLDEN_M, GOLDEN_N);
-    __gloden_cvrtbf16(output_f32, output_f16, GOLDEN_M, GOLDEN_N);
+    __gloden_cvrtbf16(output_f32, output_bf16, GOLDEN_M, GOLDEN_N);
 
     int mask_bytes = (GOLDEN_M * GOLDEN_N + 7) / 8;
 
-    printf("#ifndef GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_F16_H\n", GOLDEN_M, GOLDEN_N);
-    printf("#define GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_F16_H\n\n", GOLDEN_M, GOLDEN_N);
+    printf("#ifndef GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_BF16_H\n", GOLDEN_M, GOLDEN_N);
+    printf("#define GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_BF16_H\n\n", GOLDEN_M, GOLDEN_N);
     printf("#include <stdint.h>\n\n");
     printf("#define GOLDEN_SOFTMAX_M %d\n", GOLDEN_M);
     printf("#define GOLDEN_SOFTMAX_N %d\n\n", GOLDEN_N);
@@ -81,8 +81,8 @@ int main(void) {
     printf("\n");
     print_u8_array("golden_softmax_causal_mask", mask, mask_bytes);
     printf("\n");
-    print_u16_array("golden_softmax_output_f16", output_f16, TOTAL);
+    print_u16_array("golden_softmax_output_bf16", output_bf16, TOTAL);
 
-    printf("\n#endif /* GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_F16_H */\n", GOLDEN_M, GOLDEN_N);
+    printf("\n#endif /* GOLDEN_MASKED_SOFTMAX_M%d_N%d_CAUSAL_BF16_H */\n", GOLDEN_M, GOLDEN_N);
     return 0;
 }

@@ -48,10 +48,10 @@ typedef struct {
     int8_t *attn_norm_q8;
     float *attn_norm_scale;
 
-    uint16_t *q_f16;
-    uint16_t *k_f16;
-    uint16_t *v_f16_t;
-    uint16_t *scores_f16;
+    uint16_t *q_bf16;
+    uint16_t *k_bf16;
+    uint16_t *v_bf16_t;
+    uint16_t *scores_bf16;
 
     float *attn_context_f32;
     int8_t *attn_q8;
@@ -183,7 +183,7 @@ static inline void cute_llama_project_qkv(
     cute_tensor_t q_weight = {(void *)cfg->proj_q_weight, (uint64_t)embed,
                               embed, q_dim, CUTEDataTypeI8I8I32};
     cute_llama_matmul_post(cfg, &a, &q_weight,
-                           ws->q_f16, (uint64_t)q_dim * sizeof(uint16_t),
+                           ws->q_bf16, (uint64_t)q_dim * sizeof(uint16_t),
                            sizeof(uint16_t), &bias,
                            ws->attn_norm_scale,
                            (float *)cfg->proj_q_weight_scale,
@@ -195,7 +195,7 @@ static inline void cute_llama_project_qkv(
                               embed, kv_dim, CUTEDataTypeI8I8I32};
     bias.cols = kv_dim;
     cute_llama_matmul_post(cfg, &a, &k_weight,
-                           ws->k_f16, (uint64_t)kv_dim * sizeof(uint16_t),
+                           ws->k_bf16, (uint64_t)kv_dim * sizeof(uint16_t),
                            sizeof(uint16_t), &bias,
                            ws->attn_norm_scale,
                            (float *)cfg->proj_k_weight_scale,
@@ -207,7 +207,7 @@ static inline void cute_llama_project_qkv(
                               embed, v_dim, CUTEDataTypeI8I8I32};
     bias.cols = v_dim;
     cute_llama_matmul_post(cfg, &a, &v_weight,
-                           ws->v_f16_t, (uint64_t)seq * sizeof(uint16_t),
+                           ws->v_bf16_t, (uint64_t)seq * sizeof(uint16_t),
                            sizeof(uint16_t), &bias,
                            ws->attn_norm_scale,
                            (float *)cfg->proj_v_weight_scale,
@@ -236,10 +236,10 @@ static inline void cute_llama_attention(
 
     for (int h = 0; h < cfg->n_head_q; h++) {
         int kv_head = h / q_per_kv;
-        uint16_t *q_head = ws->q_f16 + h * cfg->key_dim;
-        uint16_t *k_head = ws->k_f16 + kv_head * cfg->key_dim;
+        uint16_t *q_head = ws->q_bf16 + h * cfg->key_dim;
+        uint16_t *k_head = ws->k_bf16 + kv_head * cfg->key_dim;
         uint16_t *score_head =
-            ws->scores_f16 + (size_t)h * seq * seq;
+            ws->scores_bf16 + (size_t)h * seq * seq;
 
         cute_tensor_t q = {q_head, (uint64_t)q_dim * sizeof(uint16_t),
                            seq, cfg->key_dim, CUTEDataTypeBF16BF16F32};
@@ -258,9 +258,9 @@ static inline void cute_llama_attention(
     for (int h = 0; h < cfg->n_head_q; h++) {
         int kv_head = h / q_per_kv;
         uint16_t *score_head =
-            ws->scores_f16 + (size_t)h * seq * seq;
+            ws->scores_bf16 + (size_t)h * seq * seq;
         uint16_t *v_head =
-            ws->v_f16_t + (size_t)kv_head * cfg->value_dim * seq;
+            ws->v_bf16_t + (size_t)kv_head * cfg->value_dim * seq;
         float *ctx_head = ws->attn_context_f32 + h * cfg->value_dim;
 
         cute_tensor_t scores = {score_head, (uint64_t)seq * sizeof(uint16_t),

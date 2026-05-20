@@ -15,7 +15,7 @@
     "mode": "return_code_and_bit_exact",
     "tensors": [
       {
-        "tensor": "golden_fuse_output_f16",
+        "tensor": "golden_fuse_output_bf16",
         "symbol": "output"
       }
     ]

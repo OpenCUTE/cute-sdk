@@ -30,7 +30,7 @@
     "mode": "return_code_and_bit_exact",
     "tensors": [
       {
-        "tensor": "golden_output_f16",
+        "tensor": "golden_output_bf16",
         "symbol": "output",
         "float_tolerance_percent": 0.5
       }

@@ -1,5 +1,5 @@
 {
-  "id": "primitive_rope_pos17_m64_head_dim64_n_head1",
+  "id": "primitive_rope_bf16_pos0_m64_head_dim64_n_head1",
   "op_ref": "ops/vector/rope.yaml",
   "level": "primitive",
   "build": {
@@ -10,12 +10,12 @@
     "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
     "trace_source": "run.out"
   },
-  "golden": "golden/manual/vector/rope_pos17_m64_head_dim64_n_head1/manifest.json",
+  "golden": "golden/manual/vector/rope_bf16_pos0_m64_head_dim64_n_head1/manifest.json",
   "verify": {
     "mode": "return_code_and_bit_exact",
     "tensors": [
       {
-        "tensor": "golden_rope_output_f16",
+        "tensor": "golden_rope_output_bf16",
         "symbol": "output"
       }
     ]

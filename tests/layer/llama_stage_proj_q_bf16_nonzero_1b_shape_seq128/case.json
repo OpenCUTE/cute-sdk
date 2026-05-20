@@ -1,5 +1,5 @@
 {
-  "id": "llama_stage_proj_v_nonzero_1b_shape_seq128",
+  "id": "llama_stage_proj_q_bf16_nonzero_1b_shape_seq128",
   "level": "layer",
   "op_ref": "ops/layer/llama_block.yaml",
   "build": {
@@ -16,7 +16,7 @@
     "mode": "return_code_and_bit_exact",
     "tensors": [
       {
-        "tensor": "golden_v_f16_t",
+        "tensor": "golden_q_bf16",
         "symbol": "output",
         "float_tolerance_percent": 0.5
       }

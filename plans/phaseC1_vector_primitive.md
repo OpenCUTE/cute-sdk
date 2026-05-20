@@ -79,9 +79,9 @@ primitive 层只接收普通 buffer、stride、shape 和显式参数：
 | `primitive_silu_m128_n128` | `cute_silu_tile` |
 | `primitive_resadd_m64_n64` | `cute_resadd_tile` |
 | `primitive_hadamard_m64_n128` | `cute_hadamard_tile` + `row_absmax` 跨 tile 累积 |
-| `primitive_rope_pos0_m64_head_dim64_n_head1` | `cute_rope_bf16_tile` |
-| `primitive_rope_pos17_m64_head_dim64_n_head1` | `cute_rope_bf16_tile` |
-| `primitive_masked_softmax_m64_n128` | `cute_masked_softmax_bf16_tile` |
+| `primitive_rope_bf16_pos0_m64_head_dim64_n_head1` | `cute_rope_bf16_tile` |
+| `primitive_rope_bf16_pos17_m64_head_dim64_n_head1` | `cute_rope_bf16_tile` |
+| `primitive_masked_softmax_bf16_m64_n128` | `cute_masked_softmax_bf16_tile` |
 | `primitive_smoothquant_m128_k2048` | `cute_smoothquant` |
 | `primitive_rmsnorm_batch1_seq_len128_hidden_dim2048` | `cute_rmsnorm` + `cute_fast_sqrt` |
 | `primitive_rmsnorm_scale_batch1_seq_len128_hidden_dim2048` | `cute_rmsnorm_with_scale` + `cute_fast_sqrt` + absmax |

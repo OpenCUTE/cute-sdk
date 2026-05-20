@@ -38,8 +38,8 @@
       ],
       "stride_bytes": 512
     },
-    "golden_q_f16": {
-      "path": "q_f16.bin",
+    "golden_q_bf16": {
+      "path": "q_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 524288,
@@ -50,8 +50,8 @@
       ],
       "stride_bytes": 4096
     },
-    "golden_k_f16": {
-      "path": "k_f16.bin",
+    "golden_k_bf16": {
+      "path": "k_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 131072,
@@ -62,8 +62,8 @@
       ],
       "stride_bytes": 1024
     },
-    "golden_v_f16_t": {
-      "path": "v_f16_t.bin",
+    "golden_v_bf16_t": {
+      "path": "v_bf16_t.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 131072,
@@ -74,8 +74,8 @@
       ],
       "stride_bytes": 256
     },
-    "golden_scores_head0_f16": {
-      "path": "scores_head0_f16.bin",
+    "golden_scores_head0_bf16": {
+      "path": "scores_head0_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 32768,

@@ -1,11 +1,11 @@
 {
-  "id": "fuse_masked_softmax_kvscale_bf16cvt_m64_n128",
-  "op": "fuse_masked_softmax_kvscale_bf16cvt",
+  "id": "masked_softmax_bf16_m64_n128",
+  "op": "masked_softmax_bf16",
   "level": "primitive",
-  "op_ref": "ops/vector/fuse_masked_softmax_kvscale_bf16cvt.yaml",
+  "op_ref": "ops/vector/masked_softmax_bf16.yaml",
   "tensors": {
-    "golden_fuse_input": {
-      "path": "golden_fuse_input.bin",
+    "golden_softmax_input": {
+      "path": "golden_softmax_input.bin",
       "dtype": "F32",
       "element_bits": 32,
       "total_bytes": 32768,
@@ -16,8 +16,8 @@
       ],
       "stride_bytes": 512
     },
-    "golden_fuse_causal_mask": {
-      "path": "golden_fuse_causal_mask.bin",
+    "golden_softmax_causal_mask": {
+      "path": "golden_softmax_causal_mask.bin",
       "dtype": "U1_PACKED",
       "element_bits": 8,
       "total_bytes": 1024,
@@ -27,8 +27,8 @@
       ],
       "stride_bytes": 1024
     },
-    "golden_fuse_output_bf16": {
-      "path": "golden_fuse_output_bf16.bin",
+    "golden_softmax_output_bf16": {
+      "path": "golden_softmax_output_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 16384,
@@ -42,16 +42,14 @@
   },
   "attributes": {
     "m": 64,
-    "n": 128,
-    "fuse_masked_softmax_kvscale_bf16cvt": 1,
-    "fuse_kvscale": 0.3535533905932738
+    "n": 128
   },
   "verify": {
     "mode": "bit_exact",
     "tensors": [
-      "golden_fuse_input",
-      "golden_fuse_causal_mask",
-      "golden_fuse_output_bf16"
+      "golden_softmax_input",
+      "golden_softmax_causal_mask",
+      "golden_softmax_output_bf16"
     ]
   },
   "generator": {
@@ -64,6 +62,6 @@
     "created": "2026-05-20"
   },
   "files": {
-    "header": "golden_fuse_masked_softmax_kvscale_bf16cvt.h"
+    "header": "golden_masked_softmax_bf16.h"
   }
 }

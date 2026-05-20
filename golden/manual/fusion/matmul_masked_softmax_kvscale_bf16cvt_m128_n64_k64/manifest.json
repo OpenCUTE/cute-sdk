@@ -3,8 +3,8 @@
   "op": "matmul_masked_softmax_kvscale_bf16cvt",
   "level": "fusion",
   "tensors": {
-    "golden_output_f16": {
-      "path": "golden_output_f16.bin",
+    "golden_output_bf16": {
+      "path": "golden_output_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 16384,

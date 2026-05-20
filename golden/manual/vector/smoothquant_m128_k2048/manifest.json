@@ -59,7 +59,7 @@
     "qemu_cpu": "rv64,v=true,vlen=512,zvfh=true",
     "compiler": "riscv64-unknown-elf-gcc",
     "cflags": "-O2 -static -march=rv64gcv_zvl512b_zvfh -mabi=lp64d",
-    "created": "2026-05-17"
+    "created": "2026-05-20"
   },
   "files": {
     "header": "golden_smoothquant.h"

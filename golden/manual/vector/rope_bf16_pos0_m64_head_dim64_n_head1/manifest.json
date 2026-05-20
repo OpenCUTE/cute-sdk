@@ -1,8 +1,8 @@
 {
-  "id": "rope_pos0_m64_head_dim64_n_head1",
-  "op": "rope_pos0",
+  "id": "rope_bf16_pos0_m64_head_dim64_n_head1",
+  "op": "rope_bf16_pos0",
   "level": "primitive",
-  "op_ref": "ops/vector/rope_pos0.yaml",
+  "op_ref": "ops/vector/rope_bf16_pos0.yaml",
   "tensors": {
     "golden_rope_input": {
       "path": "golden_rope_input.bin",
@@ -26,8 +26,8 @@
       ],
       "stride_bytes": 128
     },
-    "golden_rope_output_f16": {
-      "path": "golden_rope_output_f16.bin",
+    "golden_rope_output_bf16": {
+      "path": "golden_rope_output_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 8192,
@@ -49,7 +49,7 @@
     "tensors": [
       "golden_rope_input",
       "golden_rope_theta",
-      "golden_rope_output_f16"
+      "golden_rope_output_bf16"
     ]
   },
   "generator": {
@@ -62,6 +62,6 @@
     "created": "2026-05-20"
   },
   "files": {
-    "header": "golden_rope_pos0.h"
+    "header": "golden_rope_bf16_pos0.h"
   }
 }

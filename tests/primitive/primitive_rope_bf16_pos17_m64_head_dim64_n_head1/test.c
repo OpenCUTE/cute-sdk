@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "cutelib/primitive/include/cute_sequence.h"
-#include "golden/manual/vector/rope_pos17_m64_head_dim64_n_head1/golden_rope_pos17.h"
+#include "golden/manual/vector/rope_bf16_pos17_m64_head_dim64_n_head1/golden_rope_bf16_pos17.h"
 #include "tests/primitive/primitive_test_utils.h"
 
 static uint16_t output[GOLDEN_ROPE_M * GOLDEN_ROPE_HEAD_DIM] CUTE_TEST_ALIGN;

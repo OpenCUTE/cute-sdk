@@ -49,8 +49,8 @@
       ],
       "stride_bytes": 128
     },
-    "golden_fuse_output_f16": {
-      "path": "golden_fuse_output_f16.bin",
+    "golden_fuse_output_bf16": {
+      "path": "golden_fuse_output_bf16.bin",
       "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 8192,
@@ -75,7 +75,7 @@
       "golden_fuse_input_scale",
       "golden_fuse_weight_scale",
       "golden_fuse_rope_theta",
-      "golden_fuse_output_f16"
+      "golden_fuse_output_bf16"
     ]
   },
   "generator": {
