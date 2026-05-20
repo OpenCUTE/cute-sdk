@@ -108,7 +108,7 @@ static inline void cute_fuse_dequant_silu_tile(
                                  output, output_stride,
                                  input_scale, weight_scale,
                                  rows, cols);
-    cute_silu_tile(output, output_stride, rows, cols);
+    cute_silu_tile_fast(output, output_stride, rows, cols);
 }
 
 static inline void cute_fuse_dequant_hadamard_tile(

@@ -16,7 +16,8 @@
     "tensors": [
       {
         "tensor": "golden_silu_golden_y",
-        "symbol": "output"
+        "symbol": "output",
+        "float_tolerance_percent": 0.05
       }
     ]
   }

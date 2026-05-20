@@ -1,0 +1,36 @@
+{
+  "id": "llama_block_nonzero_weight_1b_shape_seq128",
+  "op": "llama_block",
+  "level": "layer",
+  "tensors": {
+    "golden_output": {
+      "path": "golden_output.bin",
+      "dtype": "F32",
+      "element_bits": 32,
+      "total_bytes": 1048576,
+      "layout": "row_major",
+      "shape": [
+        128,
+        2048
+      ],
+      "stride_bytes": 8192
+    }
+  },
+  "attributes": {
+    "seq_len": 128,
+    "embed_dim": 2048,
+    "key_dim": 64,
+    "value_dim": 64,
+    "n_head_q": 32,
+    "n_head_kv": 8,
+    "ffn_dim": 8192,
+    "input": "deterministic nonzero input.bin embedded with incbin",
+    "weights": "all projection and FFN int8 weights are deterministic nonzero .bin files embedded with incbin",
+    "weight_pattern": "64x64 nonzero deterministic pattern repeated over output and K dimensions",
+    "expected": "full nonzero-weight llama block output"
+  },
+  "generator": {
+    "tool": "golden/manual/generators/layer/gen_llama_block_nonzero_weight.py",
+    "created": "2026-05-19"
+  }
+}

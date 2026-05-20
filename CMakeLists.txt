@@ -250,13 +250,23 @@ function(add_layer_test case_dir)
     get_filename_component(case_name ${case_dir} NAME)
     set(test_src ${CMAKE_CURRENT_SOURCE_DIR}/tests/layer/${case_dir}/test.c)
     set(data_dir ${CMAKE_CURRENT_SOURCE_DIR}/tests/layer/${case_dir})
+    set(layer_sources ${test_src})
 
     if(NOT EXISTS ${test_src})
         message(WARNING "Skipping ${case_name}: test.c not found")
         return()
     endif()
 
-    add_executable(${case_name} ${test_src})
+    set(weights_src_in ${data_dir}/weights.c.in)
+    if(EXISTS ${weights_src_in})
+        set(generated_layer_dir ${CMAKE_BINARY_DIR}/generated/layer)
+        file(MAKE_DIRECTORY ${generated_layer_dir})
+        set(weights_src ${generated_layer_dir}/${case_name}_weights.c)
+        configure_file(${weights_src_in} ${weights_src} @ONLY)
+        list(APPEND layer_sources ${weights_src})
+    endif()
+
+    add_executable(${case_name} ${layer_sources})
     target_include_directories(${case_name} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${data_dir}
@@ -274,3 +284,4 @@ endfunction()
 
 add_layer_test(llama_block_zero_weight_seq128_embed64)
 add_layer_test(llama_block_zero_weight_1b_shape_seq128)
+add_layer_test(llama_block_nonzero_weight_1b_shape_seq128)

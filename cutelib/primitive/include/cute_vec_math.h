@@ -1,6 +1,7 @@
 #ifndef CUTE_VEC_MATH_H
 #define CUTE_VEC_MATH_H
 
+#include <float.h>
 #include <math.h>
 #include <riscv_vector.h>
 #include <stddef.h>
@@ -24,6 +25,12 @@ static inline vfloat32m4_t cute_vec_recip_approx(vfloat32m4_t x, size_t vl)
 
     correction = __riscv_vfnmsac_vv_f32m4(two, x, recip, vl);
     recip = __riscv_vfmul_vv_f32m4(recip, correction, vl);
+
+    vfloat32m4_t abs_x = __riscv_vfabs_v_f32m4(x, vl);
+    vbool8_t mask_inf = __riscv_vmfgt_vf_f32m4_b8(abs_x, FLT_MAX, vl);
+    vfloat32m4_t signed_zero = __riscv_vfsgnj_vv_f32m4(
+        __riscv_vfmv_v_f_f32m4(0.0f, vl), x, vl);
+    recip = __riscv_vmerge_vvm_f32m4(recip, signed_zero, mask_inf, vl);
     return recip;
 }
 
