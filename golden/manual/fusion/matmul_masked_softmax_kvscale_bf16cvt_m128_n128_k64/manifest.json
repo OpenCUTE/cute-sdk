@@ -5,7 +5,7 @@
   "tensors": {
     "golden_output_f16": {
       "path": "golden_output_f16.bin",
-      "dtype": "F16",
+      "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 32768,
       "layout": "row_major",

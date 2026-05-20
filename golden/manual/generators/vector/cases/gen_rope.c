@@ -1,5 +1,5 @@
 /*
- * Golden generator for RoPE with F16 output.
+ * Golden generator for RoPE with BF16 output.
  * Params: GOLDEN_M, GOLDEN_HEAD_DIM, GOLDEN_N_HEAD, ROPE_POS
  */
 
@@ -29,8 +29,9 @@ static void print_f32_array(const char *name, const float *data, int n) {
     for (int i = 0; i < n; i++) {
         if (i % 4 == 0) printf("    ");
         printf("%a", data[i]);
-        if (i < n - 1) printf(", ");
+        if (i < n - 1) printf(",");
         if (i % 4 == 3 || i == n - 1) printf("\n");
+        else printf(" ");
     }
     printf("};\n");
 }
@@ -40,8 +41,9 @@ static void print_u16_array(const char *name, const uint16_t *data, int n) {
     for (int i = 0; i < n; i++) {
         if (i % 8 == 0) printf("    ");
         printf("0x%04x", data[i]);
-        if (i < n - 1) printf(", ");
+        if (i < n - 1) printf(",");
         if (i % 8 == 7 || i == n - 1) printf("\n");
+        else printf(" ");
     }
     printf("};\n");
 }
@@ -60,7 +62,7 @@ int main(void) {
     cute_fill_rope_theta(rope_theta, HALF_DIM);
 
     __gloden_rope(input, output_f32, rope_theta, ROPE_POS, 1, GOLDEN_N_HEAD, GOLDEN_M, GOLDEN_HEAD_DIM);
-    __gloden_cvrtfp16(output_f32, output_f16, GOLDEN_M, GOLDEN_HEAD_DIM);
+    __gloden_cvrtbf16(output_f32, output_f16, GOLDEN_M, GOLDEN_HEAD_DIM);
 
     printf("#ifndef GOLDEN_ROPE_M%d_HEAD%d_POS%d_F16_H\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);
     printf("#define GOLDEN_ROPE_M%d_HEAD%d_POS%d_F16_H\n\n", GOLDEN_M, GOLDEN_HEAD_DIM, ROPE_POS);

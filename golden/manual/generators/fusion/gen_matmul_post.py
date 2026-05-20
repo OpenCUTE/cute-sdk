@@ -35,6 +35,13 @@ def pack_f16(values: list[float]) -> bytes:
     return b"".join(struct.pack("<e", f32(v)) for v in values)
 
 
+def pack_bf16_trunc(values: list[float]) -> bytes:
+    return b"".join(
+        struct.pack("<H", struct.unpack("<I", struct.pack("<f", f32(v)))[0] >> 16)
+        for v in values
+    )
+
+
 def bits_to_f32(value: int) -> float:
     return struct.unpack("<f", struct.pack("<I", value & 0xFFFFFFFF))[0]
 
@@ -235,7 +242,12 @@ def emit_single(case_id: str, values: list[float],
                 rows: int, cols: int, dtype: str, element_bits: int) -> None:
     case_dir = OUT_ROOT / case_id
     case_dir.mkdir(parents=True, exist_ok=True)
-    payload = pack_f32(values) if element_bits == 32 else pack_f16(values)
+    if dtype == "F32":
+        payload = pack_f32(values)
+    elif dtype == "BF16":
+        payload = pack_bf16_trunc(values)
+    else:
+        payload = pack_f16(values)
     (case_dir / "golden_output.bin").write_bytes(payload)
     elem_bytes = element_bits // 8
     write_manifest(
@@ -314,13 +326,13 @@ def emit_softmax(case_id: str, output: list[float],
                  rows: int, cols: int, k: int) -> None:
     case_dir = OUT_ROOT / case_id
     case_dir.mkdir(parents=True, exist_ok=True)
-    (case_dir / "golden_output_f16.bin").write_bytes(pack_f16(output))
+    (case_dir / "golden_output_f16.bin").write_bytes(pack_bf16_trunc(output))
     write_manifest(
         case_dir,
         case_id,
         {
             "golden_output_f16": tensor_desc(
-                "golden_output_f16.bin", "F16", 16, [rows, cols], cols * 2
+                "golden_output_f16.bin", "BF16", 16, [rows, cols], cols * 2
             )
         },
         {
@@ -401,7 +413,7 @@ def main() -> int:
         "F32",
         32,
     )
-    emit_single("matmul_dequant_bf16cvt_m128_n128", deq128, M128, N128, "F16", 16)
+    emit_single("matmul_dequant_bf16cvt_m128_n128", deq128, M128, N128, "BF16", 16)
     emit_single(
         "matmul_dequant_bf16cvt_transpose_m128_n128",
         [
@@ -411,7 +423,7 @@ def main() -> int:
         ],
         N128,
         M128,
-        "F16",
+        "BF16",
         16,
     )
 
@@ -422,7 +434,7 @@ def main() -> int:
         rope(deq64, M128, N64, 17),
         M128,
         N64,
-        "F16",
+        "BF16",
         16,
     )
 

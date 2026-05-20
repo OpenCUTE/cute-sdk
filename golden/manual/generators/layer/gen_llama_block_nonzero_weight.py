@@ -57,8 +57,11 @@ def f32a(value) -> np.ndarray:
     return np.asarray(value, dtype=np.float32)
 
 
-def to_f16_f32(value: np.ndarray) -> np.ndarray:
-    return value.astype(np.float16).astype(np.float32)
+def to_bf16_f32(value: np.ndarray) -> np.ndarray:
+    arr = np.ascontiguousarray(np.asarray(value, dtype=np.float32))
+    bits = arr.view(np.uint32)
+    truncated = (bits & np.uint32(0xFFFF0000)).astype(np.uint32, copy=False)
+    return truncated.view(np.float32).reshape(arr.shape)
 
 
 def c_float(value: float) -> str:
@@ -265,10 +268,10 @@ def apply_rope(dequant_data: np.ndarray, total_dim: int) -> np.ndarray:
         output[:, head0 + KEY_DIM // 2:head0 + KEY_DIM] = f32a(
             f32a(real_in * sin_v) + f32a(imag_in * cos_v)
         )
-    return to_f16_f32(output)
+    return to_bf16_f32(output)
 
 
-def masked_softmax_f16(scores: np.ndarray) -> np.ndarray:
+def masked_softmax_bf16(scores: np.ndarray) -> np.ndarray:
     scaled = f32a(scores * KV_SCALE)
     col = np.arange(SEQ_LEN, dtype=np.int32)[None, :]
     row = np.arange(SEQ_LEN, dtype=np.int32)[:, None]
@@ -278,7 +281,7 @@ def masked_softmax_f16(scores: np.ndarray) -> np.ndarray:
     shifted = np.where(np.isneginf(scaled), np.float32(-90.0), shifted)
     exps = exp_approx(shifted)
     denom = f32a(np.sum(exps, axis=1, dtype=np.float32))
-    return to_f16_f32(f32a(exps / denom[:, None]))
+    return to_bf16_f32(f32a(exps / denom[:, None]))
 
 
 def tensor_desc(path: str, dtype: str, element_bits: int,
@@ -301,8 +304,10 @@ def emit_i8_bin(path: Path, array: np.ndarray) -> None:
     path.write_bytes(np.asarray(array, dtype=np.int8).tobytes())
 
 
-def emit_f16_bin(path: Path, array: np.ndarray) -> None:
-    path.write_bytes(np.asarray(array, dtype="<f2").tobytes())
+def emit_bf16_bin(path: Path, array: np.ndarray) -> None:
+    arr = np.ascontiguousarray(np.asarray(array, dtype=np.float32))
+    bf16 = (arr.view(np.uint32) >> np.uint32(16)).astype("<u2", copy=False)
+    path.write_bytes(bf16.tobytes())
 
 
 def emit_f32_bin(path: Path, array: np.ndarray) -> None:
@@ -425,28 +430,28 @@ def emit_manifest() -> None:
             ),
             "golden_q_f16": tensor_desc(
                 "q_f16.bin",
-                "F16",
+                "BF16",
                 16,
                 [SEQ_LEN, N_HEAD_Q * KEY_DIM],
                 N_HEAD_Q * KEY_DIM * 2,
             ),
             "golden_k_f16": tensor_desc(
                 "k_f16.bin",
-                "F16",
+                "BF16",
                 16,
                 [SEQ_LEN, N_HEAD_KV * KEY_DIM],
                 N_HEAD_KV * KEY_DIM * 2,
             ),
             "golden_v_f16_t": tensor_desc(
                 "v_f16_t.bin",
-                "F16",
+                "BF16",
                 16,
                 [N_HEAD_KV * VALUE_DIM, SEQ_LEN],
                 SEQ_LEN * 2,
             ),
             "golden_scores_head0_f16": tensor_desc(
                 "scores_head0_f16.bin",
-                "F16",
+                "BF16",
                 16,
                 [SEQ_LEN, SEQ_LEN],
                 SEQ_LEN * 2,
@@ -544,14 +549,14 @@ def main() -> int:
 
     q_f16 = apply_rope(dequant(q_acc, attn_norm_scale, PROJ_Q_SCALE), N_HEAD_Q * KEY_DIM)
     k_f16 = apply_rope(dequant(k_acc, attn_norm_scale, PROJ_K_SCALE), N_HEAD_KV * KEY_DIM)
-    v_f16 = to_f16_f32(dequant(v_acc, attn_norm_scale, PROJ_V_SCALE))
-    emit_f16_bin(OUT_ROOT / "q_f16.bin", q_f16)
-    emit_f16_bin(OUT_ROOT / "k_f16.bin", k_f16)
+    v_f16 = to_bf16_f32(dequant(v_acc, attn_norm_scale, PROJ_V_SCALE))
+    emit_bf16_bin(OUT_ROOT / "q_f16.bin", q_f16)
+    emit_bf16_bin(OUT_ROOT / "k_f16.bin", k_f16)
     v_f16_t = np.transpose(
         v_f16.reshape(SEQ_LEN, N_HEAD_KV, VALUE_DIM),
         (1, 2, 0),
     ).copy()
-    emit_f16_bin(OUT_ROOT / "v_f16_t.bin", v_f16_t)
+    emit_bf16_bin(OUT_ROOT / "v_f16_t.bin", v_f16_t)
 
     scores_f16 = np.empty((N_HEAD_Q, SEQ_LEN, SEQ_LEN), dtype=np.float32)
     attn_context_f32 = np.empty((SEQ_LEN, EMBED_DIM), dtype=np.float32)
@@ -560,11 +565,11 @@ def main() -> int:
     for h in range(N_HEAD_Q):
         kv_h = h // (N_HEAD_Q // N_HEAD_KV)
         score = f32a(q_heads[:, h, :] @ k_heads[:, kv_h, :].T)
-        probs = masked_softmax_f16(score)
+        probs = masked_softmax_bf16(score)
         scores_f16[h] = probs
         ctx = f32a(probs @ v_f16_t[kv_h].T)
         attn_context_f32[:, h * VALUE_DIM:(h + 1) * VALUE_DIM] = ctx
-    emit_f16_bin(OUT_ROOT / "scores_head0_f16.bin", scores_f16[0])
+    emit_bf16_bin(OUT_ROOT / "scores_head0_f16.bin", scores_f16[0])
 
     attn_q8, attn_scale = smoothquant(attn_context_f32)
     proj_o_acc = grouped_matmul_i8(attn_q8, EMBED_DIM, WEIGHTS["proj_o"][2])

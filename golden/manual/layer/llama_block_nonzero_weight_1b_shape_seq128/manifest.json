@@ -40,7 +40,7 @@
     },
     "golden_q_f16": {
       "path": "q_f16.bin",
-      "dtype": "F16",
+      "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 524288,
       "layout": "row_major",
@@ -52,7 +52,7 @@
     },
     "golden_k_f16": {
       "path": "k_f16.bin",
-      "dtype": "F16",
+      "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 131072,
       "layout": "row_major",
@@ -64,7 +64,7 @@
     },
     "golden_v_f16_t": {
       "path": "v_f16_t.bin",
-      "dtype": "F16",
+      "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 131072,
       "layout": "row_major",
@@ -76,7 +76,7 @@
     },
     "golden_scores_head0_f16": {
       "path": "scores_head0_f16.bin",
-      "dtype": "F16",
+      "dtype": "BF16",
       "element_bits": 16,
       "total_bytes": 32768,
       "layout": "row_major",

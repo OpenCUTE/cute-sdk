@@ -36,10 +36,12 @@ static void print_f32_array(const char *name, const float *data, int n)
         }
         printf("%a", data[i]);
         if (i < n - 1) {
-            printf(", ");
+            printf(",");
         }
         if (i % 4 == 3 || i == n - 1) {
             printf("\n");
+        } else {
+            printf(" ");
         }
     }
     printf("};\n");
@@ -54,10 +56,12 @@ static void print_i32_array(const char *name, const int32_t *data, int n)
         }
         printf("%d", data[i]);
         if (i < n - 1) {
-            printf(", ");
+            printf(",");
         }
         if (i % 4 == 3 || i == n - 1) {
             printf("\n");
+        } else {
+            printf(" ");
         }
     }
     printf("};\n");
@@ -72,10 +76,12 @@ static void print_u16_array(const char *name, const uint16_t *data, int n)
         }
         printf("0x%04x", data[i]);
         if (i < n - 1) {
-            printf(", ");
+            printf(",");
         }
         if (i % 8 == 7 || i == n - 1) {
             printf("\n");
+        } else {
+            printf(" ");
         }
     }
     printf("};\n");
@@ -90,10 +96,12 @@ static void print_u8_array(const char *name, const uint8_t *data, int n)
         }
         printf("0x%02x", data[i]);
         if (i < n - 1) {
-            printf(", ");
+            printf(",");
         }
         if (i % 16 == 15 || i == n - 1) {
             printf("\n");
+        } else {
+            printf(" ");
         }
     }
     printf("};\n");
@@ -180,7 +188,7 @@ int main(void)
 #elif defined(FUSE_DEQUANT_BF16CVT)
     uint16_t output_f16[TOTAL];
     memset(output_f16, 0, sizeof(output_f16));
-    __gloden_cvrtfp16(dequant, output_f16, GOLDEN_M, GOLDEN_N);
+    __gloden_cvrtbf16(dequant, output_f16, GOLDEN_M, GOLDEN_N);
 
     print_common_header("GOLDEN_FUSE_DEQUANT_BF16CVT_H");
     print_i32_array("golden_fuse_input_i32", input_i32, TOTAL);
@@ -201,7 +209,7 @@ int main(void)
     memset(output_f16, 0, sizeof(output_f16));
     cute_fill_rope_theta(rope_theta, HALF_N);
     __gloden_rope(dequant, rope_f32, rope_theta, FUSE_ROPE_POS, 1, 1, GOLDEN_M, GOLDEN_N);
-    __gloden_cvrtfp16(rope_f32, output_f16, GOLDEN_M, GOLDEN_N);
+    __gloden_cvrtbf16(rope_f32, output_f16, GOLDEN_M, GOLDEN_N);
 
     print_common_header("GOLDEN_FUSE_DEQUANT_ROPE_BF16CVT_H");
     print_i32_array("golden_fuse_input_i32", input_i32, TOTAL);
@@ -256,7 +264,7 @@ int main(void)
     cute_fill_causal_mask(mask, GOLDEN_M, GOLDEN_N);
     scale_f32(input, scaled, (float)FUSE_KVSCALE, TOTAL);
     __gloden_softmax(scaled, softmax, mask, GOLDEN_M, GOLDEN_N);
-    __gloden_cvrtfp16(softmax, output_f16, GOLDEN_M, GOLDEN_N);
+    __gloden_cvrtbf16(softmax, output_f16, GOLDEN_M, GOLDEN_N);
 
     print_common_header("GOLDEN_FUSE_MASKED_SOFTMAX_KVSCALE_BF16CVT_H");
     print_f32_array("golden_fuse_input", input, TOTAL);

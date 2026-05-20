@@ -10,6 +10,13 @@ static inline float cute_dequant_i32(int32_t acc, float input_scale, float weigh
     return (float)acc * input_scale * weight_scale;
 }
 
+static inline vuint16m2_t cute_f32m4_to_bf16m2_trunc(vfloat32m4_t input, size_t vl)
+{
+    vuint32m4_t bits = __riscv_vreinterpret_v_f32m4_u32m4(input);
+    bits = __riscv_vsrl_vx_u32m4(bits, 16, vl);
+    return __riscv_vnsrl_wx_u16m2(bits, 0, vl);
+}
+
 static inline void cute_f32_to_f16_tile(const float *input, uint64_t input_stride,
                                         void *output, uint64_t output_stride,
                                         int rows, int cols)
@@ -33,7 +40,17 @@ static inline void cute_f32_to_bf16_tile(const float *input, uint64_t input_stri
                                          void *output, uint64_t output_stride,
                                          int rows, int cols)
 {
-    cute_f32_to_f16_tile(input, input_stride, output, output_stride, rows, cols);
+    for (int r = 0; r < rows; r++) {
+        const float *input_row = (const float *)((const char *)input + r * input_stride);
+        uint16_t *output_row = (uint16_t *)((char *)output + r * output_stride);
+        size_t vl;
+        for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vfloat32m4_t vec = __riscv_vle32_v_f32m4(&input_row[c], vl);
+            vuint16m2_t vec_bf16 = cute_f32m4_to_bf16m2_trunc(vec, vl);
+            __riscv_vse16_v_u16m2(&output_row[c], vec_bf16, vl);
+        }
+    }
 }
 
 static inline void cute_dequant_i32_to_f32_tile(const int32_t *input, uint64_t input_stride,
@@ -109,8 +126,20 @@ static inline void cute_dequant_i32_to_bf16_tile(const int32_t *input, uint64_t 
                                                  const float *weight_scale,
                                                  int rows, int cols)
 {
-    cute_dequant_i32_to_f16_tile(input, input_stride, output, output_stride,
-                                 input_scale, weight_scale, rows, cols);
+    for (int r = 0; r < rows; r++) {
+        float scale = input_scale[r] * weight_scale[0];
+        const int32_t *input_row = (const int32_t *)((const char *)input + r * input_stride);
+        uint16_t *output_row = (uint16_t *)((char *)output + r * output_stride);
+        size_t vl;
+        for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vint32m4_t input_vec = __riscv_vle32_v_i32m4(&input_row[c], vl);
+            vfloat32m4_t deq = __riscv_vfmul_vf_f32m4(
+                __riscv_vfcvt_f_x_v_f32m4(input_vec, vl), scale, vl);
+            vuint16m2_t deq_bf16 = cute_f32m4_to_bf16m2_trunc(deq, vl);
+            __riscv_vse16_v_u16m2(&output_row[c], deq_bf16, vl);
+        }
+    }
 }
 
 static inline void cute_dequant_i32_to_bf16_transpose_tile(
@@ -120,10 +149,21 @@ static inline void cute_dequant_i32_to_bf16_transpose_tile(
     const float *weight_scale,
     int rows, int cols)
 {
-    cute_dequant_i32_to_f16_transpose_tile(input, input_stride,
-                                           output, output_stride,
-                                           input_scale, weight_scale,
-                                           rows, cols);
+    for (int r = 0; r < rows; r++) {
+        const int32_t *input_row = (const int32_t *)((const char *)input + r * input_stride);
+        uint16_t *output_row = (uint16_t *)((char *)output + r * output_stride);
+        size_t vl;
+        for (int c = 0, avl = cols; avl > 0; c += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vint32m4_t input_vec = __riscv_vle32_v_i32m4(&input_row[c], vl);
+            vfloat32m4_t scale_vec = __riscv_vle32_v_f32m4(&input_scale[c], vl);
+            scale_vec = __riscv_vfmul_vf_f32m4(scale_vec, weight_scale[0], vl);
+            vfloat32m4_t deq = __riscv_vfmul_vv_f32m4(
+                __riscv_vfcvt_f_x_v_f32m4(input_vec, vl), scale_vec, vl);
+            vuint16m2_t deq_bf16 = cute_f32m4_to_bf16m2_trunc(deq, vl);
+            __riscv_vse16_v_u16m2(&output_row[c], deq_bf16, vl);
+        }
+    }
 }
 
 #endif /* CUTE_CONVERT_H */

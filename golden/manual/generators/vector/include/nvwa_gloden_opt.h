@@ -312,6 +312,32 @@ static inline void __gloden_cvrtfp16(void* x, void* y, int M, int N) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  cvrtbf16 (F32 -> BF16 truncation)                                 */
+/* ------------------------------------------------------------------ */
+static inline vuint16m2_t __gloden_f32m4_to_bf16m2_trunc(vfloat32m4_t input, size_t vl)
+{
+    vuint32m4_t bits = __riscv_vreinterpret_v_f32m4_u32m4(input);
+    bits = __riscv_vsrl_vx_u32m4(bits, 16, vl);
+    return __riscv_vnsrl_wx_u16m2(bits, 0, vl);
+}
+
+static inline void __gloden_cvrtbf16(void* x, void* y, int M, int N) {
+    for (int i = 0; i < M; i++) {
+        float* input_row_f32 = &((float*)x)[i*N];
+        uint16_t* output_row_bf16 = &((uint16_t*)y)[i*N];
+        size_t avl, vl;
+        size_t vl_0 = __riscv_vsetvl_e32m4(N);
+        vl = vl_0;
+        for (int j = 0, avl = N; avl > 0; j += vl, avl -= vl) {
+            vl = __riscv_vsetvl_e32m4(avl);
+            vfloat32m4_t vec = __riscv_vle32_v_f32m4(&input_row_f32[j], vl);
+            vuint16m2_t vec_bf16 = __gloden_f32m4_to_bf16m2_trunc(vec, vl);
+            __riscv_vse16_v_u16m2(&output_row_bf16[j], vec_bf16, vl);
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /*  softmax (with bitmask mask)                                       */
 /* ------------------------------------------------------------------ */
 static inline void __gloden_softmax(float* x, float* y, void* bitmask_ptr, int M, int N)

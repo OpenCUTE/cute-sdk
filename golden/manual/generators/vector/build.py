@@ -56,6 +56,14 @@ def make_test_case_id(golden_case_id):
     return f"primitive_{golden_case_id}"
 
 
+def is_bf16_output_case(case_name):
+    return (
+        "bf16cvt" in case_name
+        or case_name.startswith("rope_pos")
+        or case_name == "masked_softmax"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Parse .h content and extract arrays → .bin files
 # ---------------------------------------------------------------------------
@@ -226,26 +234,35 @@ def write_test_case(test_case_id, case_name, golden_manifest_rel):
     """Create tests/primitive/<test_case_id>/case.json referencing the golden manifest."""
     test_dir = SDK_ROOT / "tests" / "primitive" / test_case_id
     test_dir.mkdir(parents=True, exist_ok=True)
-    case = {
-        "id": test_case_id,
-        "op_ref": f"ops/vector/{case_name}.yaml",
-        "level": "primitive",
-        "build": {
-            "source": "test.c",
-            "target": "test.riscv",
-        },
-        "run": {
-            "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
-            "trace_source": "run.out",
-        },
-        "golden": str(golden_manifest_rel),
-        "verify": {
-            "mode": "return_code",
-        },
-    }
     case_path = test_dir / "case.json"
+    if case_path.exists():
+        with open(case_path, "r") as f:
+            case = json.load(f)
+        case["golden"] = str(golden_manifest_rel)
+        case.setdefault("id", test_case_id)
+        case.setdefault("op_ref", f"ops/vector/{case_name}.yaml")
+        case.setdefault("level", "primitive")
+    else:
+        case = {
+            "id": test_case_id,
+            "op_ref": f"ops/vector/{case_name}.yaml",
+            "level": "primitive",
+            "build": {
+                "source": "test.c",
+                "target": "test.riscv",
+            },
+            "run": {
+                "hwconfig": "cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48",
+                "trace_source": "run.out",
+            },
+            "golden": str(golden_manifest_rel),
+            "verify": {
+                "mode": "return_code",
+            },
+        }
     with open(case_path, "w") as f:
         json.dump(case, f, indent=2)
+        f.write("\n")
     return case_path
 
 
@@ -293,6 +310,10 @@ def run_case(qemu, qemu_cpu, binary, case_dir, case_id, case_name, params):
         return
 
     tensor_meta = write_bin_files(case_dir, arrays)
+    if is_bf16_output_case(case_name):
+        for name, tensor in tensor_meta.items():
+            if "output" in name.lower() and tensor["element_bits"] == 16:
+                tensor["dtype"] = "BF16"
     for name in tensor_meta:
         print(f"    {name}.bin")
 

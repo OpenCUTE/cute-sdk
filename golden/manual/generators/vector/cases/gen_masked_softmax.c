@@ -1,5 +1,5 @@
 /*
- * Golden generator for masked softmax with causal mask, F16 output.
+ * Golden generator for masked softmax with causal mask, BF16 output.
  * Params: GOLDEN_M, GOLDEN_N
  */
 
@@ -22,8 +22,9 @@ static void print_f32_array(const char *name, const float *data, int n) {
     for (int i = 0; i < n; i++) {
         if (i % 4 == 0) printf("    ");
         printf("%a", data[i]);
-        if (i < n - 1) printf(", ");
+        if (i < n - 1) printf(",");
         if (i % 4 == 3 || i == n - 1) printf("\n");
+        else printf(" ");
     }
     printf("};\n");
 }
@@ -33,8 +34,9 @@ static void print_u16_array(const char *name, const uint16_t *data, int n) {
     for (int i = 0; i < n; i++) {
         if (i % 8 == 0) printf("    ");
         printf("0x%04x", data[i]);
-        if (i < n - 1) printf(", ");
+        if (i < n - 1) printf(",");
         if (i % 8 == 7 || i == n - 1) printf("\n");
+        else printf(" ");
     }
     printf("};\n");
 }
@@ -44,8 +46,9 @@ static void print_u8_array(const char *name, const uint8_t *data, int n) {
     for (int i = 0; i < n; i++) {
         if (i % 16 == 0) printf("    ");
         printf("0x%02x", data[i]);
-        if (i < n - 1) printf(", ");
+        if (i < n - 1) printf(",");
         if (i % 16 == 15 || i == n - 1) printf("\n");
+        else printf(" ");
     }
     printf("};\n");
 }
@@ -64,7 +67,7 @@ int main(void) {
     cute_fill_causal_mask(mask, GOLDEN_M, GOLDEN_N);
 
     __gloden_softmax(input, output_f32, mask, GOLDEN_M, GOLDEN_N);
-    __gloden_cvrtfp16(output_f32, output_f16, GOLDEN_M, GOLDEN_N);
+    __gloden_cvrtbf16(output_f32, output_f16, GOLDEN_M, GOLDEN_N);
 
     int mask_bytes = (GOLDEN_M * GOLDEN_N + 7) / 8;
 
