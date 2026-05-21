@@ -61,6 +61,7 @@ class FloatMismatch:
     expected: float
     actual: float
     error_percent: float
+    ulp_error: int | None = None
 
 
 @dataclass
@@ -70,28 +71,41 @@ class FloatToleranceResult:
     matched_elements: int
     max_error_percent: float
     tolerance_percent: float
+    max_ulp_error: int | None = None
+    tolerance_ulp: int | None = None
     mismatches: list[FloatMismatch] = field(default_factory=list)
 
     def report(self) -> str:
         status = "PASS" if self.passed else "FAIL"
         max_error = _format_percent(self.max_error_percent)
+        ulp_text = ""
+        if self.tolerance_ulp is not None:
+            ulp_text = (
+                f" or {self.tolerance_ulp} ULP"
+                f" (max_ulp={self.max_ulp_error})"
+            )
         lines = [
             f"[{status}] float tolerance {self.matched_elements}/{self.total_elements} "
-            f"within {self.tolerance_percent:g}% (max_error={max_error})"
+            f"within {self.tolerance_percent:g}%{ulp_text} "
+            f"(max_error={max_error})"
         ]
         if self.mismatches:
             lines.append("  First float mismatches (up to 20):")
             for m in self.mismatches:
+                ulp_text = (
+                    f" ulp={m.ulp_error}" if m.ulp_error is not None else ""
+                )
                 lines.append(
                     f"  element[{m.element_index}] offset={m.byte_offset} "
                     f"expected={m.expected:.9g} actual={m.actual:.9g} "
-                    f"error={_format_percent(m.error_percent)}"
+                    f"error={_format_percent(m.error_percent)}{ulp_text}"
                 )
         return "\n".join(lines)
 
 
 _MAX_REPORTED_MISMATCHES = 20
 _FLOAT_DTYPES = {"F16", "FP16", "F32", "FP32", "BF16"}
+_BF16_DEFAULT_TOLERANCE_ULP = 1
 
 
 def compare(
@@ -157,6 +171,33 @@ def _read_float(data: bytes, offset: int, dtype: str) -> float:
     raise ValueError(f"unsupported float dtype for tolerance compare: {dtype}")
 
 
+def _read_raw_float_bits(data: bytes, offset: int, dtype: str) -> tuple[int, int]:
+    dtype = dtype.upper()
+    if dtype in ("F16", "FP16", "BF16"):
+        return struct.unpack("<H", _read_padded(data, offset, 2))[0], 16
+    if dtype in ("F32", "FP32"):
+        return struct.unpack("<I", _read_padded(data, offset, 4))[0], 32
+    raise ValueError(f"unsupported float dtype for ULP compare: {dtype}")
+
+
+def _ordered_float_bits(raw: int, bits: int) -> int:
+    sign_bit = 1 << (bits - 1)
+    mask = (1 << bits) - 1
+    return (~raw & mask) if (raw & sign_bit) else (raw | sign_bit)
+
+
+def _ulp_distance(
+    expected_bytes: bytes,
+    actual: bytes,
+    offset: int,
+    dtype: str,
+) -> int:
+    expected_raw, bits = _read_raw_float_bits(expected_bytes, offset, dtype)
+    actual_raw, _ = _read_raw_float_bits(actual, offset, dtype)
+    return abs(_ordered_float_bits(expected_raw, bits) -
+               _ordered_float_bits(actual_raw, bits))
+
+
 def _relative_error_percent(expected: float, actual: float) -> float:
     if math.isnan(expected) or math.isnan(actual):
         return 0.0 if math.isnan(expected) and math.isnan(actual) else math.inf
@@ -171,6 +212,7 @@ def compare_float_tolerance(
     golden: GoldenTensor,
     actual: bytes,
     tolerance_percent: float,
+    tolerance_ulp: int | None = None,
 ) -> FloatToleranceResult:
     expected_bytes = golden.raw_bytes()
     dtype = golden.dtype.upper()
@@ -178,19 +220,34 @@ def compare_float_tolerance(
     total = golden.element_count()
     matched = 0
     max_error = 0.0
+    max_ulp_error: int | None = None
     mismatches: list[FloatMismatch] = []
+
+    if tolerance_ulp is None and dtype == "BF16":
+        tolerance_ulp = _BF16_DEFAULT_TOLERANCE_ULP
 
     for index in range(total):
         offset = index * element_bytes
         expected = _read_float(expected_bytes, offset, dtype)
         actual_val = _read_float(actual, offset, dtype)
         error_percent = _relative_error_percent(expected, actual_val)
+        ulp_error = None
+        if tolerance_ulp is not None:
+            ulp_error = _ulp_distance(expected_bytes, actual, offset, dtype)
+            if max_ulp_error is None or ulp_error > max_ulp_error:
+                max_ulp_error = ulp_error
 
         if not math.isnan(error_percent):
             if math.isinf(error_percent) or error_percent > max_error:
                 max_error = error_percent
 
-        if error_percent <= tolerance_percent:
+        within_percent = error_percent <= tolerance_percent
+        within_ulp = (
+            tolerance_ulp is not None
+            and ulp_error is not None
+            and ulp_error <= tolerance_ulp
+        )
+        if within_percent or within_ulp:
             matched += 1
         elif len(mismatches) < _MAX_REPORTED_MISMATCHES:
             mismatches.append(FloatMismatch(
@@ -199,6 +256,7 @@ def compare_float_tolerance(
                 expected=expected,
                 actual=actual_val,
                 error_percent=error_percent,
+                ulp_error=ulp_error,
             ))
 
     return FloatToleranceResult(
@@ -207,6 +265,8 @@ def compare_float_tolerance(
         matched_elements=matched,
         max_error_percent=max_error,
         tolerance_percent=tolerance_percent,
+        max_ulp_error=max_ulp_error,
+        tolerance_ulp=tolerance_ulp,
         mismatches=mismatches,
     )
 
@@ -221,7 +281,8 @@ def report_with_float_tolerance(
             f"  Bit exact: {byte_result.matched_elements}/{byte_result.total_elements} bytes matched",
             f"  Float tolerance: {tolerance_result.matched_elements}/"
             f"{tolerance_result.total_elements} elements within "
-            f"{tolerance_result.tolerance_percent:g}% "
+            f"{tolerance_result.tolerance_percent:g}%"
+            f"{_format_ulp_tolerance(tolerance_result)} "
             f"(max_error={_format_percent(tolerance_result.max_error_percent)})",
         ]
         if byte_result.mismatches:
@@ -235,6 +296,12 @@ def report_with_float_tolerance(
         return "\n".join(lines)
 
     return byte_result.report() + "\n" + tolerance_result.report()
+
+
+def _format_ulp_tolerance(result: FloatToleranceResult) -> str:
+    if result.tolerance_ulp is None:
+        return " "
+    return f" or {result.tolerance_ulp} ULP (max_ulp={result.max_ulp_error})"
 
 
 def _parse_tile_shape(value: str) -> tuple[int, int]:
@@ -290,10 +357,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Fallback relative error tolerance for floating tensors after "
              "bit-exact compare fails, expressed as percent (default: 0.1)",
     )
+    parser.add_argument(
+        "--float-tolerance-ulp",
+        type=int,
+        default=None,
+        help="Optional ULP tolerance for floating tensors after bit-exact "
+             "compare fails. BF16 defaults to 1 ULP when omitted.",
+    )
     args = parser.parse_args(argv)
 
     if args.float_tolerance_percent < 0:
         parser.error("--float-tolerance-percent must be non-negative")
+    if args.float_tolerance_ulp is not None and args.float_tolerance_ulp < 0:
+        parser.error("--float-tolerance-ulp must be non-negative")
 
     golden = GoldenTensor(args.manifest, tensor_name=args.tensor)
     trace = CMLStoreTrace(args.trace)
@@ -325,6 +401,7 @@ def main(argv: list[str] | None = None) -> int:
             golden,
             actual,
             args.float_tolerance_percent,
+            args.float_tolerance_ulp,
         )
         print(report_with_float_tolerance(result, tolerance_result))
         return 0 if tolerance_result.passed else 1

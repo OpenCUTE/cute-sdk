@@ -263,6 +263,21 @@ function(add_layer_test case_dir)
         file(MAKE_DIRECTORY ${generated_layer_dir})
         set(weights_src ${generated_layer_dir}/${case_name}_weights.c)
         configure_file(${weights_src_in} ${weights_src} @ONLY)
+        file(READ ${weights_src_in} weights_src_template)
+        string(REGEX MATCHALL
+            "@CMAKE_CURRENT_SOURCE_DIR@/[^\"\n]+\\.bin"
+            weight_bin_refs "${weights_src_template}")
+        set(weight_bin_deps)
+        foreach(weight_bin_ref IN LISTS weight_bin_refs)
+            string(REPLACE "@CMAKE_CURRENT_SOURCE_DIR@"
+                "${CMAKE_CURRENT_SOURCE_DIR}"
+                weight_bin_dep "${weight_bin_ref}")
+            list(APPEND weight_bin_deps ${weight_bin_dep})
+        endforeach()
+        if(weight_bin_deps)
+            set_source_files_properties(${weights_src} PROPERTIES
+                OBJECT_DEPENDS "${weight_bin_deps}")
+        endif()
         list(APPEND layer_sources ${weights_src})
     endif()
 

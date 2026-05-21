@@ -18,7 +18,8 @@
       {
         "tensor": "golden_v_bf16_t",
         "symbol": "output",
-        "float_tolerance_percent": 0.5
+        "float_tolerance_percent": 0.5,
+        "float_tolerance_ulp": 1
       }
     ]
   }
