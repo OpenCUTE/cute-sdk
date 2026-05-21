@@ -1,6 +1,7 @@
 hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
 build: false
-parallel: 3
+parallel: 6
+timeout_seconds: 1200
 cases:
   - fusion_matmul_dequant_silu
   - fusion_matmul_dequant_resadd

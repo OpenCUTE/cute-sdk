@@ -1,5 +1,6 @@
 hwconfig: cute4tops_shuttle512_d512_v512_m512_sysbus512_membus1_core_dramsim48
 build: false
 parallel: 1
+timeout_seconds: 36000
 cases:
   - llama_block_zero_weight_seq128_embed64
