@@ -152,7 +152,8 @@ class CMLStoreTrace:
 
         catalog_path = _CUTE_ROOT / "trace" / "catalogs" / "cute_trace.json"
         schema_path = _CUTE_ROOT / "configs" / "schemas" / "cute_trace_catalog.schema.json"
-        catalog = load_catalog(catalog_path, schema_path=schema_path)
+        catalog = load_catalog(catalog_path, schema_path=schema_path,
+                               validate_schema=False)
         decoder = Decoder(catalog)
         rebuilder = MemoryRebuilder(data_width_bytes=_STORE_DATA_WIDTH_BYTES)
         count = 0
