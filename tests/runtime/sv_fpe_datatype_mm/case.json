@@ -1,0 +1,28 @@
+{
+  "id": "runtime_sv_fpe_datatype_mm",
+  "op_ref": "ops/tensor/matmul.yaml",
+  "level": "runtime",
+  "description": "Parameterized SV FPE GEMM case generated from the C-model",
+  "bindings": {
+    "A.dtype": "runtime parameter",
+    "A.shape": "runtime parameter",
+    "B.shape": "runtime parameter",
+    "C.bias_mode": "runtime parameter",
+    "D.shape": "runtime parameter",
+    "transpose": "runtime parameter",
+    "blockscale": "runtime parameter"
+  },
+  "build": {
+    "source": "test.c",
+    "target": "runtime_sv_fpe_datatype_mm.riscv"
+  },
+  "run": {
+    "hwconfig": "runtime parameter",
+    "trace_source": "CMemoryLoader Store trace"
+  },
+  "verify": {
+    "mode": "bit_exact",
+    "tensor": "D",
+    "golden": "generated manifest"
+  }
+}

@@ -107,6 +107,43 @@ add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit_transpose)
 add_runtime_test(runtime_matmul_mxfp8e4m3_64_64_64_zeroinit)
 add_runtime_test(runtime_matmul_i8_tiled_128x128_fifo)
 
+# Parameterized SV FPE GEMM tests. The SDK runner generates case_data.h and
+# batch_case_*.h from the C-model before building these targets.
+set(SV_FPE_BATCH_MODE "0" CACHE STRING
+    "SV FPE runtime batch order: 0=all, 1=NVFP4, 2..5=prefix experiments")
+set(SV_FPE_RUNTIME_CASE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/sv_fpe_datatype_mm)
+
+add_executable(sv_fpe_datatype_mm ${SV_FPE_RUNTIME_CASE_DIR}/test.c)
+target_include_directories(sv_fpe_datatype_mm PRIVATE
+    ${SV_FPE_RUNTIME_CASE_DIR}
+    ${SV_FPE_RUNTIME_CASE_DIR}/generated
+)
+target_link_libraries(sv_fpe_datatype_mm PRIVATE
+    cutelib_runtime
+    cute_riscv_baremetal_options
+)
+set_target_properties(sv_fpe_datatype_mm PROPERTIES
+    SUFFIX .riscv
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/runtime
+)
+
+add_executable(sv_fpe_datatype_mm_batch ${SV_FPE_RUNTIME_CASE_DIR}/batch_test.c)
+target_include_directories(sv_fpe_datatype_mm_batch PRIVATE
+    ${SV_FPE_RUNTIME_CASE_DIR}
+    ${SV_FPE_RUNTIME_CASE_DIR}/generated
+)
+target_compile_definitions(sv_fpe_datatype_mm_batch PRIVATE
+    BATCH_MODE=${SV_FPE_BATCH_MODE}
+)
+target_link_libraries(sv_fpe_datatype_mm_batch PRIVATE
+    cutelib_runtime
+    cute_riscv_baremetal_options
+)
+set_target_properties(sv_fpe_datatype_mm_batch PROPERTIES
+    SUFFIX .riscv
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/runtime
+)
+
 # ============================================================
 # Tensor-level tests
 # ============================================================

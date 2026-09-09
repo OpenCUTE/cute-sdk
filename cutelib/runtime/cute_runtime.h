@@ -74,6 +74,12 @@ static inline int cute_fifo_full(void) {
     return CUTE_QUERY_MACRO_INST_FIFO_FULL() != 0;
 }
 
+// Release the oldest completed macro task. The caller must obey FIFO order:
+// wait for the current tail task before dequeuing it.
+static inline uint64_t cute_fifo_dequeue(void) {
+    return CUTE_CLEAR_INST();
+}
+
 // FIFO 当前占用状态（bitmask，bit N = 1 表示位置 N 有指令）
 static inline uint64_t cute_fifo_info(void) {
     return CUTE_QUERY_MACRO_INST_FIFO_INFO();

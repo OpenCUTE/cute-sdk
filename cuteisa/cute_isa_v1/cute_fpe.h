@@ -1,7 +1,7 @@
 /**
  * Auto-generated from cute_isa_v1 enums.ElementDataType
  * DO NOT EDIT MANUALLY
- * Generated at: Wed May 13 16:04:42 2026
+ * Generated at: Thu Aug 20 15:41:43 2026
  */
 
 #ifndef CUTE_FPE_H
@@ -21,8 +21,15 @@
 #define CUTEDataTypemxfp4F32 10  // MXFP4 * MXFP4 -> FP32
 #define CUTEDataTypefp8e4m3F32 11  // FP8 E4M3 * FP8 E4M3 -> FP32
 #define CUTEDataTypefp8e5m2F32 12  // FP8 E5M2 * FP8 E5M2 -> FP32
+#define CUTEDataTypeMxfp6e3m2F32 13  // MXFP6 E3M2 * MXFP6 E3M2 -> FP32
+#define CUTEDataTypeMxfp6e2m3F32 14  // MXFP6 E2M3 * MXFP6 E2M3 -> FP32
+#define CUTEDataTypeI4I4I32 15  // Int4 * Int4 -> Int32
+#define CUTEDataTypeI4U4I32 16  // Int4 * UInt4 -> Int32
+#define CUTEDataTypeU4I4I32 17  // UInt4 * Int4 -> Int32
+#define CUTEDataTypeU4U4I32 18  // UInt4 * UInt4 -> Int32
+#define CUTEDataTypemxint4F32 19  // MXINT4 * MXINT4 -> FP32
 
-#define CUTE_MAX_ELEMENT_TYPE 12
+#define CUTE_MAX_ELEMENT_TYPE 19
 
 // Data Type A Bit Width Queries
 #define CUTE_GET_ADATA_BITWIDTH(elem_type) \
@@ -39,7 +46,14 @@
     ((elem_type) == 10 ? 4 : \
     ((elem_type) == 11 ? 8 : \
     ((elem_type) == 12 ? 8 : \
-    32)))))))))))))
+    ((elem_type) == 13 ? 8 : \
+    ((elem_type) == 14 ? 8 : \
+    ((elem_type) == 15 ? 4 : \
+    ((elem_type) == 16 ? 4 : \
+    ((elem_type) == 17 ? 4 : \
+    ((elem_type) == 18 ? 4 : \
+    ((elem_type) == 19 ? 4 : \
+    32))))))))))))))))))))
 
 // Data Type B Bit Width Queries
 #define CUTE_GET_BDATA_BITWIDTH(elem_type) \
@@ -56,7 +70,14 @@
     ((elem_type) == 10 ? 4 : \
     ((elem_type) == 11 ? 8 : \
     ((elem_type) == 12 ? 8 : \
-    32)))))))))))))
+    ((elem_type) == 13 ? 8 : \
+    ((elem_type) == 14 ? 8 : \
+    ((elem_type) == 15 ? 4 : \
+    ((elem_type) == 16 ? 4 : \
+    ((elem_type) == 17 ? 4 : \
+    ((elem_type) == 18 ? 4 : \
+    ((elem_type) == 19 ? 4 : \
+    32))))))))))))))))))))
 
 // Data Type Name Strings
 #define CUTE_DATATYPE_NAME(elem_type) \
@@ -73,7 +94,14 @@
     ((elem_type) == 10 ? "mxfp4FP32" : \
     ((elem_type) == 11 ? "fp8e4m3FP32" : \
     ((elem_type) == 12 ? "fp8e5m2FP32" : \
-    "Unknown")))))))))))))
+    ((elem_type) == 13 ? "Mxfp6e3m2FP32" : \
+    ((elem_type) == 14 ? "Mxfp6e2m3FP32" : \
+    ((elem_type) == 15 ? "I4I4I32" : \
+    ((elem_type) == 16 ? "I4U4I32" : \
+    ((elem_type) == 17 ? "U4I4I32" : \
+    ((elem_type) == 18 ? "U4U4I32" : \
+    ((elem_type) == 19 ? "mxint4FP32" : \
+    "Unknown"))))))))))))))))))))
 
 // Stride Calculation Macros
 #define CUTE_CALC_M_STRIDE(elem_type, k) \
