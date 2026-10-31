@@ -1,7 +1,7 @@
 /**
  * Auto-generated from cute_isa_v1
  * DO NOT EDIT MANUALLY
- * Generated at: Wed May 13 16:04:42 2026
+ * Generated at: Tue Oct 27 17:49:42 2026
  */
 
 #ifndef CUTE_INSTRUCTION_H
@@ -52,28 +52,19 @@
     (funct7 <<(7+5+1+1+1+5+5))
 
 #define YGJK_INS_RRR(rd, rs1, rs2, funct) \
-{                                           \
-    __asm__ __volatile__ (                   \
-        "sd t0, -24(sp)\n\t"              \
-        "sd t1, -16(sp)\n\t"              \
-        "sd t2,  -8(sp)\n\t"              \
-        "add t1, zero, %1\n\t"            \
-        "add t2, zero, %2\n\t"            \
-        ".word " _CUTE_GET_VALUE(_CUTE_ENC(_CUTE_CUSTOM0,5,1,1,1,6,7,funct)) "\n\t" \
-        "add %0, zero, t0\n\t"            \
-        "ld t0, -24(sp)\n\t"              \
-        "ld t1, -16(sp)\n\t"              \
-        "ld t2,  -8(sp)\n\t"              \
-        :"=r"(rd)                           \
-        :"r" (rs1) , "r" (rs2)            \
-        :"t0","t1","t2","memory"           \
-        );                                   \
+{ \
+    __asm__ __volatile__ ( \
+        ".insn r 0x0b, 7, " _CUTE_GET_VALUE(funct) ", %0, %1, %2\n\t" \
+        "add %0, %0, zero\n\t" \
+        : "=&r" (rd) \
+        : "r" ((uint64_t)(rs1)), "r" ((uint64_t)(rs2)) \
+        : "memory"); \
 }
 
 // ========================================
 // Instruction Function Codes
 // ========================================
-// YGK/RoCC Interface Instructions (funct 1-8): direct values
+// YGJK/RoCC interface instructions: direct funct values
 // CUTE Internal Instructions (funct + 64): need to add 64
 
 #define CUTE_INST_FUNCT_QUERY_ACCELERATOR_BUSY        1  // 查询加速器是否正在运行
@@ -84,6 +75,7 @@
 #define CUTE_INST_FUNCT_QUERY_MACRO_INST_FINISH       6  // 查询 CUTE 宏指令的完成情况
 #define CUTE_INST_FUNCT_QUERY_MACRO_INST_FIFO_FULL    7  // 查询 CUTE 宏指令队列是否已满
 #define CUTE_INST_FUNCT_QUERY_MACRO_INST_FIFO_INFO    8  // 查询 CUTE 宏指令队列目前有多少指令
+#define CUTE_INST_FUNCT_TRACE_MARK                    9  // Emit a task checkpoint at command acceptance and return its sequence.
 #define CUTE_INST_FUNCT_SEND_MACRO_INST               64  // [+64] 发送已配置的宏指令到指令FIFO
 #define CUTE_INST_FUNCT_CONFIG_TENSOR_A               65  // [+64] 配置A张量的基地址和步长
 #define CUTE_INST_FUNCT_CONFIG_TENSOR_B               66  // [+64] 配置B张量的基地址和步长
@@ -124,6 +116,17 @@
 
 // Instruction: QUERY_MACRO_INST_FIFO_INFO (funct = 8)
 // 查询 CUTE 宏指令队列目前有多少指令
+
+// Instruction: TRACE_MARK (funct = 9)
+// Emit a task checkpoint at command acceptance and return its sequence.
+// cfgData1 fields:
+#define CUTE_INST_TRACE_MARK_CFGDATA1_seq_HI                         63
+#define CUTE_INST_TRACE_MARK_CFGDATA1_seq_LO                         0  // Per-hart task checkpoint sequence.
+#define CUTE_INST_TRACE_MARK_CFGDATA1_seq_WIDTH                      64
+// cfgData2 fields:
+#define CUTE_INST_TRACE_MARK_CFGDATA2_key_HI                         63
+#define CUTE_INST_TRACE_MARK_CFGDATA2_key_LO                         0  // Software task descriptor key.
+#define CUTE_INST_TRACE_MARK_CFGDATA2_key_WIDTH                      64
 
 // Instruction: SEND_MACRO_INST (funct = 0)
 // 发送已配置的宏指令到指令FIFO
@@ -268,6 +271,12 @@
 // Field Extraction Macros
 // ========================================
 
+// Extract fields for TRACE_MARK (cfgData1)
+#define CUTE_GET_TRACE_MARK_CFGDATA1_seq(cfgdata1) (((cfgdata1) >> 0) & 0xFFFFFFFFFFFFFFFFUL)
+
+// Extract fields for TRACE_MARK (cfgData2)
+#define CUTE_GET_TRACE_MARK_CFGDATA2_key(cfgdata2) (((cfgdata2) >> 0) & 0xFFFFFFFFFFFFFFFFUL)
+
 // Extract fields for CONFIG_TENSOR_A (cfgData1)
 #define CUTE_GET_CONFIG_TENSOR_A_CFGDATA1_ApplicationTensor_A_BaseVaddr(cfgdata1) (((cfgdata1) >> 0) & 0xFFFFFFFFFFFFFFFFUL)
 
@@ -324,6 +333,14 @@
 // ========================================
 // Field Assembly Macros
 // ========================================
+
+// Assemble cfgData1 for TRACE_MARK
+#define CUTE_ASSEMBLY_TRACE_MARK_CFGDATA1(seq) ( \
+  ((((uint64_t)(seq)) & 0xFFFFFFFFFFFFFFFFUL) << 0))
+
+// Assemble cfgData2 for TRACE_MARK
+#define CUTE_ASSEMBLY_TRACE_MARK_CFGDATA2(key) ( \
+  ((((uint64_t)(key)) & 0xFFFFFFFFFFFFFFFFUL) << 0))
 
 // Assemble cfgData1 for CONFIG_TENSOR_A
 #define CUTE_ASSEMBLY_CONFIG_TENSOR_A_CFGDATA1(applicationtensor_a_basevaddr) ( \
@@ -484,6 +501,19 @@
  *
  * cfgData1: Not used
  * cfgData2: Not used
+ */
+
+/*
+ * Instruction: TRACE_MARK
+ * Type: YGK/RoCC Interface
+ * Funct: 9
+ * Description: Emit a task checkpoint at command acceptance and return its sequence.
+ * Return: Echo seq after the marker has been accepted.
+ *
+ * cfgData1:
+ *   [63:0] seq - Per-hart task checkpoint sequence.
+ * cfgData2:
+ *   [63:0] key - Software task descriptor key.
  */
 
 /*
@@ -716,6 +746,15 @@ uint64_t CUTE_QUERY_MACRO_INST_FIFO_INFO(void)
 {
     uint64_t res1=0;
     YGJK_INS_RRR(res1, 0, 0, CUTE_INST_FUNCT_QUERY_MACRO_INST_FIFO_INFO);
+    return res1;
+}
+
+// Emit a task checkpoint at command acceptance and return its sequence.
+// 返回值: Echo seq after the marker has been accepted.
+uint64_t CUTE_TRACE_MARK(uint64_t seq, uint64_t key)
+{
+    uint64_t res1=0;
+    YGJK_INS_RRR(res1, seq, key, CUTE_INST_FUNCT_TRACE_MARK);
     return res1;
 }
 

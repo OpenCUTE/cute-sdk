@@ -15,18 +15,19 @@ Auto-generated from `isa.json`. Do not edit manually.
 直接在 RoCC 接口层处理的 YGK/RoCC 接口指令组。
 
 - rocc_funct_offset: `0`
-- instruction_count: `8`
+- instruction_count: `9`
 
 | Instruction | Funct | RoCC Funct | Return | Description |
 |-------------|-------|------------|--------|-------------|
-| `QUERY_ACCELERATOR_BUSY` | `1` | `1` | 未使用 | 未使用 |
-| `QUERY_RUNTIME` | `2` | `2` | 未使用 | 未使用 |
+| `QUERY_ACCELERATOR_BUSY` | `1` | `1` | 返回加速器是否忙碌 (1=忙碌, 0=空闲) | 查询加速器是否正在运行 |
+| `QUERY_RUNTIME` | `2` | `2` | 返回加速器运行时间（时钟周期数） | 查询加速器运行时间（时钟周期数） |
 | `QUERY_MEM_READ_COUNT` | `3` | `3` | 返回对外访存读次数 | 查询加速器对外访存读次数 |
 | `QUERY_MEM_WRITE_COUNT` | `4` | `4` | 返回对外访存写次数 | 查询加速器对外访存写次数 |
-| `QUERY_COMPUTE_TIME` | `5` | `5` | 未使用 | 未使用 |
+| `QUERY_COMPUTE_TIME` | `5` | `5` | 返回计算时间（时钟周期数） | 查询加速器计算时间 |
 | `QUERY_MACRO_INST_FINISH` | `6` | `6` | 返回宏指令队列中的完成情况 (0010 = id为1的指令已完成) | 查询 CUTE 宏指令的完成情况 |
 | `QUERY_MACRO_INST_FIFO_FULL` | `7` | `7` | 返回FIFO是否已满 (1=满, 0=未满) | 查询 CUTE 宏指令队列是否已满 |
 | `QUERY_MACRO_INST_FIFO_INFO` | `8` | `8` | 返回FIFO中当前指令状态 (0010 = id为1的位置已有指令) | 查询 CUTE 宏指令队列目前有多少指令 |
+| `TRACE_MARK` | `9` | `9` | Echo seq after the marker has been accepted. | Emit a task checkpoint at command acceptance and return its sequence. |
 
 ### cute
 通过 RoCC funct 偏移量 64 转发到 CUTE 核心的内部控制指令组。

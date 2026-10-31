@@ -1,0 +1,5 @@
+version: 1
+id: int8_runtime
+depends_on: [rvv_runtime.yaml]
+isa:
+  custom_contracts: [int8_matmul_wrap32_v1]

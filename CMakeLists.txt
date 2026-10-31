@@ -1,36 +1,59 @@
 cmake_minimum_required(VERSION 3.15)
 project(cute_sdk C)
 
+set(CUTE_TARGET_CMAKE "" CACHE FILEPATH "Generated, checked OpenCUTE target bundle")
+if(CUTE_TARGET_CMAKE)
+    include(${CUTE_TARGET_CMAKE})
+else()
+    # Legacy standalone SDK use. System/model builders always pass a bundle.
+    set(CUTE_TARGET_MARCH rv64gcv_zvl512b_zvfh)
+    set(CUTE_TARGET_BASE_MARCH rv64imafdcv)
+    set(CUTE_TARGET_MABI lp64d)
+    set(CUTE_TARGET_ISA_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cuteisa/cute_isa_v1)
+    set(CUTE_TARGET_HAS_TCM ON)
+endif()
+if(NOT CUTE_TARGET_BASE_MARCH)
+    set(CUTE_TARGET_BASE_MARCH ${CUTE_TARGET_MARCH})
+endif()
+
 # ---- RISC-V 编译参数 ----
 add_library(cute_riscv_baremetal_options INTERFACE)
 target_compile_options(cute_riscv_baremetal_options INTERFACE
     -std=gnu99 -O3
-    -march=rv64imafdcv -mabi=lp64d
+    -march=${CUTE_TARGET_BASE_MARCH} -mabi=${CUTE_TARGET_MABI}
     -specs=htif_nano.specs
     -fno-common -fno-builtin-printf -Wall
 )
 target_link_options(cute_riscv_baremetal_options INTERFACE
     -static -specs=htif_nano.specs
+    -march=${CUTE_TARGET_BASE_MARCH} -mabi=${CUTE_TARGET_MABI}
 )
 
 add_library(cute_riscv_vector_baremetal_options INTERFACE)
 target_compile_options(cute_riscv_vector_baremetal_options INTERFACE
     -std=gnu99 -O3
-    -march=rv64gcv_zvl512b_zvfh -mabi=lp64d
+    -march=${CUTE_TARGET_MARCH} -mabi=${CUTE_TARGET_MABI}
     -specs=htif_nano.specs
     -fno-common -fno-builtin-printf -Wall
 )
 target_link_options(cute_riscv_vector_baremetal_options INTERFACE
     -static -specs=htif_nano.specs
-    -march=rv64gcv_zvl512b_zvfh -mabi=lp64d
+    -march=${CUTE_TARGET_MARCH} -mabi=${CUTE_TARGET_MABI}
 )
+if(CUTE_TARGET_CMAKE)
+    target_link_options(cute_riscv_baremetal_options INTERFACE "-Wl,-T,${CUTE_TARGET_LINKER}")
+    target_link_options(cute_riscv_vector_baremetal_options INTERFACE "-Wl,-T,${CUTE_TARGET_LINKER}")
+    target_compile_definitions(cute_riscv_baremetal_options INTERFACE CUTE_CHECKPOINT_DRAIN_CYCLES=${CUTE_TARGET_DRAIN_CYCLES})
+    target_compile_definitions(cute_riscv_vector_baremetal_options INTERFACE CUTE_CHECKPOINT_DRAIN_CYCLES=${CUTE_TARGET_DRAIN_CYCLES})
+endif()
 
 # ============================================================
 # L0: cuteisa — ISA 原子指令（header-only）
 # ============================================================
 add_library(cuteisa INTERFACE)
 target_include_directories(cuteisa INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/cuteisa/cute_isa_v1
+    ${CUTE_TARGET_ISA_INCLUDE}
+    ${CUTE_TARGET_MEMORY_INCLUDE}
 )
 
 # ============================================================
@@ -101,6 +124,50 @@ function(add_runtime_test case_dir)
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/runtime
     )
 endfunction()
+
+# The system runner supplies one generated fixture directory to both platforms.
+# Both are system-mode bare-metal binaries; no linux-user ABI is involved.
+set(CUTE_SYSTEM_FIXTURES "" CACHE PATH "Generated system verification input headers")
+if(CUTE_SYSTEM_FIXTURES)
+    add_executable(system_platform_contract tests/system/platform_contract.c)
+    target_include_directories(system_platform_contract PRIVATE ${CUTE_SYSTEM_FIXTURES})
+    target_link_libraries(system_platform_contract PRIVATE cute_riscv_vector_baremetal_options)
+    set_target_properties(system_platform_contract PROPERTIES SUFFIX .riscv
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/system)
+    add_executable(system_qemu_contract tests/system/qemu_contract.c)
+    target_link_libraries(system_qemu_contract PRIVATE
+        cutelib_runtime cute_riscv_vector_baremetal_options)
+    set_target_properties(system_qemu_contract PROPERTIES SUFFIX .riscv
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/system)
+    foreach(platform IN ITEMS verilator qemu)
+        add_executable(system_int8_${platform} tests/system/system_int8.c)
+        target_include_directories(system_int8_${platform} PRIVATE ${CUTE_SYSTEM_FIXTURES})
+        target_link_libraries(system_int8_${platform} PRIVATE
+            cutelib_runtime cute_riscv_vector_baremetal_options)
+        target_compile_definitions(system_int8_${platform} PRIVATE
+            CUTE_SYSTEM_PLATFORM_${platform}=1)
+        set_target_properties(system_int8_${platform} PROPERTIES SUFFIX .riscv
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/system)
+        if(CUTE_TARGET_HAS_TCM)
+        add_executable(system_tcm_${platform} tests/system/system_tcm.c)
+        target_include_directories(system_tcm_${platform} PRIVATE ${CUTE_SYSTEM_FIXTURES})
+        target_link_libraries(system_tcm_${platform} PRIVATE
+            cutelib_runtime cute_riscv_vector_baremetal_options)
+        target_compile_definitions(system_tcm_${platform} PRIVATE CUTE_SYSTEM_PLATFORM_${platform}=1)
+        set_target_properties(system_tcm_${platform} PROPERTIES SUFFIX .riscv
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/system)
+        endif()
+    endforeach()
+    foreach(fault IN ITEMS 1 2)
+        add_executable(system_int8_fault${fault} tests/system/system_int8.c)
+        target_include_directories(system_int8_fault${fault} PRIVATE ${CUTE_SYSTEM_FIXTURES})
+        target_link_libraries(system_int8_fault${fault} PRIVATE
+            cutelib_runtime cute_riscv_vector_baremetal_options)
+        target_compile_definitions(system_int8_fault${fault} PRIVATE CUTE_SYSTEM_FAULT=${fault})
+        set_target_properties(system_int8_fault${fault} PROPERTIES SUFFIX .riscv
+            RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/system)
+    endforeach()
+endif()
 
 add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit)
 add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit_transpose)
@@ -307,3 +374,20 @@ add_layer_test(llama_stage_score_head0_bf16_nonzero_1b_shape_seq128)
 add_layer_test(llama_stage_ffn_gate_nonzero_1b_shape_seq128)
 add_layer_test(llama_stage_ffn_up_nonzero_1b_shape_seq128)
 add_layer_test(llama_stage_ffn_down_nonzero_1b_shape_seq128)
+
+# cutetest BERT B1-B6 / LLaMA L1-L4 migration, generated case directories.
+set(CUTE_MODEL_FIXTURES "" CACHE PATH "Generated model stage fixtures")
+if(CUTE_MODEL_FIXTURES)
+    file(GLOB model_cases RELATIVE ${CUTE_MODEL_FIXTURES} ${CUTE_MODEL_FIXTURES}/*/model_program.h)
+    foreach(model_header ${model_cases})
+        get_filename_component(model_case ${model_header} DIRECTORY)
+        foreach(platform qemu verilator)
+            add_executable(model_${model_case}_${platform} tests/models/model.c)
+            target_include_directories(model_${model_case}_${platform} PRIVATE ${CUTE_MODEL_FIXTURES}/${model_case})
+            target_link_libraries(model_${model_case}_${platform} PRIVATE cutelib_primitive cute_riscv_vector_baremetal_options m)
+            target_compile_options(model_${model_case}_${platform} PRIVATE -ffp-contract=off)
+            target_compile_definitions(model_${model_case}_${platform} PRIVATE CUTE_SYSTEM_PLATFORM_${platform}=1)
+            set_target_properties(model_${model_case}_${platform} PROPERTIES SUFFIX .riscv RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/models)
+        endforeach()
+    endforeach()
+endif()

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "name": "system_tcm",
+  "scope": "single-hart TCM roundtrip through RVV, 64-byte profile",
+  "checkpoint_scope": "all declared outputs; hart drained",
+  "tasks": [
+    {"hart": 0, "seq": 1, "key": 1, "name": "tcm_store", "outputs": [
+      {"symbol": "sys_tcm_output", "bytes": 64, "oracle": "a_line.bin"}
+    ]},
+    {"hart": 0, "seq": 2, "key": 2, "name": "tcm_consume", "outputs": [
+      {"symbol": "sys_tcm_readback", "bytes": 64, "oracle": "a_line.bin"}
+    ]}
+  ]
+}

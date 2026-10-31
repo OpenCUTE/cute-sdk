@@ -1,0 +1,18 @@
+# ISA and explicit TCM scratch requirements of system_tcm.c.
+# ELF/data/stack placement, QEMU coverage and execution are separate checks.
+version: 1
+id: system_tcm_resources
+hart: 0
+depends_on: [../../targets/requirements/rvv_runtime.yaml]
+isa:
+  xlen: 64
+  extensions: [i, m, a, f, d, c, v, zicsr, zifencei, zvfh]
+  vlen_min_bits: 512
+memory:
+  - id: tcm_output
+    kind: tcm
+    owner: executing_hart
+    clients: [rvv]
+    permissions: [read, write]
+    min_bytes: 64
+    alignment: 64
