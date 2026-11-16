@@ -1,7 +1,7 @@
 /**
  * Auto-generated from cute_isa_v1
  * DO NOT EDIT MANUALLY
- * Generated at: Tue Oct 27 17:49:42 2026
+ * Generated at: Mon Nov 16 10:10:04 2026
  */
 
 #ifndef CUTE_INSTRUCTION_H
@@ -200,7 +200,7 @@
 // cfgData1 fields:
 #define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_element_type_HI        7
 #define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_element_type_LO        0  // 元素数据类型
-#define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_element_type_MAX_VALUE 15UL  // 软件填值不应超过此值
+#define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_element_type_MAX_VALUE 21UL  // 软件填值不应超过此值
 #define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_element_type_WIDTH     8
 #define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_bias_type_HI           15
 #define CUTE_INST_CONFIG_CONV_PARAMS_CFGDATA1_bias_type_LO           8  // C张量（bias）加载模式

@@ -70,6 +70,15 @@ Auto-generated from `isa.json`. Do not edit manually.
 | `DataTypemxfp4F32` | `10` | MXFP4 * MXFP4 -> FP32 |
 | `DataTypefp8e4m3F32` | `11` | FP8 E4M3 * FP8 E4M3 -> FP32 |
 | `DataTypefp8e5m2F32` | `12` | FP8 E5M2 * FP8 E5M2 -> FP32 |
+| `DataTypeMxfp6e3m2F32` | `13` | MXFP6 E3M2 * MXFP6 E3M2 -> FP32 |
+| `DataTypeMxfp6e2m3F32` | `14` | MXFP6 E2M3 * MXFP6 E2M3 -> FP32 |
+| `DataTypeI4I4I32` | `15` | Int4 * Int4 -> Int32 |
+| `DataTypeI4U4I32` | `16` | Int4 * UInt4 -> Int32 |
+| `DataTypeU4I4I32` | `17` | UInt4 * Int4 -> Int32 |
+| `DataTypeU4U4I32` | `18` | UInt4 * UInt4 -> Int32 |
+| `DataTypemxint4F32` | `19` | MXINT4 * MXINT4 -> FP32 |
+| `DataTypefp6e3m2F32` | `20` | FP6 E3M2 * FP6 E3M2 -> FP32 |
+| `DataTypefp6e2m3F32` | `21` | FP6 E2M3 * FP6 E2M3 -> FP32 |
 
 ### CMemoryLoaderTaskType
 C 张量（bias / 结果）加载模式。软件通过 CONFIG_CONV_PARAMS.bias_type 字段填入。

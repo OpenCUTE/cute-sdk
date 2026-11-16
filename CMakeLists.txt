@@ -173,6 +173,10 @@ add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit)
 add_runtime_test(runtime_matmul_i8_128_128_128_zeroinit_transpose)
 add_runtime_test(runtime_matmul_mxfp8e4m3_64_64_64_zeroinit)
 add_runtime_test(runtime_matmul_i8_tiled_128x128_fifo)
+add_runtime_test(sv_fpe_datatype_mm)
+target_include_directories(sv_fpe_datatype_mm PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/runtime/sv_fpe_datatype_mm/generated)
+set_target_properties(sv_fpe_datatype_mm PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # ============================================================
 # Tensor-level tests
