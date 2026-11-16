@@ -1,0 +1,19 @@
+version: 1
+id: spike_cute_v1
+machine: spike
+cpu: rv64
+xlen: 64
+max_harts: 1
+dram_base: "0x80000000"
+configurable_dram_base: true
+configurable_clint_base: true
+clint_base: "0x02000000"
+clint_bytes: 65536
+boot_io: htif
+private_tcm: configurable_single_hart
+contracts: [int8_matmul_wrap32_v1, checkpoint_v1, saturn_quiescent_checkpoint_v1]
+# target/riscv/tcg/tcg-cpu.c fixes vext_ver to VEXT_VERSION_1_00_0.
+extension_versions: {v: "1.0"}
+# Machine behavior covered by this SDK adapter. Other Chipyard devices must be
+# explicitly reported as outside workload coverage; full-target mode rejects them.
+device_compatibles: ["riscv,clint0", "sifive,clint0"]

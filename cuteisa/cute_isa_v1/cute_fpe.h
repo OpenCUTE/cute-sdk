@@ -1,7 +1,7 @@
 /**
  * Auto-generated from cute_isa_v1 enums.ElementDataType
  * DO NOT EDIT MANUALLY
- * Generated at: Thu Aug 20 15:41:43 2026
+ * Generated at: Mon Nov 16 10:10:04 2026
  */
 
 #ifndef CUTE_FPE_H
@@ -28,8 +28,10 @@
 #define CUTEDataTypeU4I4I32 17  // UInt4 * Int4 -> Int32
 #define CUTEDataTypeU4U4I32 18  // UInt4 * UInt4 -> Int32
 #define CUTEDataTypemxint4F32 19  // MXINT4 * MXINT4 -> FP32
+#define CUTEDataTypefp6e3m2F32 20  // FP6 E3M2 * FP6 E3M2 -> FP32
+#define CUTEDataTypefp6e2m3F32 21  // FP6 E2M3 * FP6 E2M3 -> FP32
 
-#define CUTE_MAX_ELEMENT_TYPE 19
+#define CUTE_MAX_ELEMENT_TYPE 21
 
 // Data Type A Bit Width Queries
 #define CUTE_GET_ADATA_BITWIDTH(elem_type) \
@@ -53,7 +55,9 @@
     ((elem_type) == 17 ? 4 : \
     ((elem_type) == 18 ? 4 : \
     ((elem_type) == 19 ? 4 : \
-    32))))))))))))))))))))
+    ((elem_type) == 20 ? 8 : \
+    ((elem_type) == 21 ? 8 : \
+    32))))))))))))))))))))))
 
 // Data Type B Bit Width Queries
 #define CUTE_GET_BDATA_BITWIDTH(elem_type) \
@@ -77,7 +81,9 @@
     ((elem_type) == 17 ? 4 : \
     ((elem_type) == 18 ? 4 : \
     ((elem_type) == 19 ? 4 : \
-    32))))))))))))))))))))
+    ((elem_type) == 20 ? 8 : \
+    ((elem_type) == 21 ? 8 : \
+    32))))))))))))))))))))))
 
 // Data Type Name Strings
 #define CUTE_DATATYPE_NAME(elem_type) \
@@ -101,7 +107,9 @@
     ((elem_type) == 17 ? "U4I4I32" : \
     ((elem_type) == 18 ? "U4U4I32" : \
     ((elem_type) == 19 ? "mxint4FP32" : \
-    "Unknown"))))))))))))))))))))
+    ((elem_type) == 20 ? "fp6e3m2FP32" : \
+    ((elem_type) == 21 ? "fp6e2m3FP32" : \
+    "Unknown"))))))))))))))))))))))
 
 // Stride Calculation Macros
 #define CUTE_CALC_M_STRIDE(elem_type, k) \

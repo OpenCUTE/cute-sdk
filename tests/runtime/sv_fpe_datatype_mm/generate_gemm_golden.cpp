@@ -75,6 +75,8 @@ bool get_type_spec(int cute_dtype, TypeSpec* spec) {
     case 17: *spec = {17, 17, "U4I4I32", 4, 128, false, true, true}; return true;
     case 18: *spec = {18, 18, "U4U4I32", 4, 128, false, true, true}; return true;
     case 19: *spec = {19, 19, "MXINT4F32", 4, 128, true, true, true}; return true;
+    case 20: *spec = {20, 50, "FP6E3M2F32", 8, 64, false, false, false}; return true;
+    case 21: *spec = {21, 44, "FP6E2M3F32", 8, 64, false, false, false}; return true;
     default: return false;
   }
 }

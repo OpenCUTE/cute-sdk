@@ -2,6 +2,3 @@
 .vscode
 __pycache__
 build
-.DS_Store
-/logs/
-*.pid

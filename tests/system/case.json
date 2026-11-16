@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "name": "system_int8_128",
+  "scope": "single-hart DDR, RVV -> CUTE -> RVV",
+  "checkpoint_scope": "all declared outputs; this S1 case drains the hart",
+  "tasks": [
+    {"hart": 0, "seq": 1, "key": 1, "name": "rvv_prepare", "outputs": [
+      {"symbol": "sys_a", "bytes": 16384, "oracle": "a.bin"},
+      {"symbol": "sys_b", "bytes": 16384, "oracle": "b.bin"}
+    ]},
+    {"hart": 0, "seq": 2, "key": 2, "name": "cute_gemm", "outputs": [
+      {"symbol": "sys_c", "bytes": 65536, "oracle": "c.bin"}
+    ]},
+    {"hart": 0, "seq": 3, "key": 3, "name": "rvv_consume", "outputs": [
+      {"symbol": "sys_v", "bytes": 65536, "oracle": "c.bin"}
+    ]}
+  ]
+}

@@ -1,5 +1,11 @@
 # CUTE-SDK
 
+当前系统/模型流程从 OpenCUTE 的 HWConfig 构建，消费生成的 `target/` 包：平台、
+ISA/ABI、TCM 客户端窗口、链接布局及 QEMU 参数来自同一目标。旧的手写
+`tests/system/platform.json` 已移除。具体入口与边界见
+`../doc/docs/config-contracts.md`；下文保留早期软件分层与开发背景，不代表 QEMU
+已覆盖所有硬件指令或设备。
+
 CUTE 加速器全栈软件开发套件。涵盖功能模拟、golden 生成、内存验证、库函数开发四个核心方向，支持 CUTE 软件编写、硬件仿真测试、FPGA demo 测试三条验证路径。
 
 ## 核心对象

@@ -47,7 +47,7 @@
     "ElementDataType": {
       "description": "矩阵元素数据类型。软件通过 CONFIG_CONV_PARAMS.element_type 字段填入。同时也是 datatype.h 的唯一数据源。",
       "scala_object": "cute.ElementDataType",
-      "bit_width": 4,
+      "bit_width": 5,
       "values": [
         {
           "name": "DataTypeI8I8I32",
@@ -152,6 +152,78 @@
           "a_bits": 8,
           "b_bits": 8,
           "c_bits": 32
+        },
+        {
+          "name": "DataTypeMxfp6e3m2F32",
+          "value": 13,
+          "description": "MXFP6 E3M2 * MXFP6 E3M2 -> FP32",
+          "a_bits": 8,
+          "b_bits": 8,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypeMxfp6e2m3F32",
+          "value": 14,
+          "description": "MXFP6 E2M3 * MXFP6 E2M3 -> FP32",
+          "a_bits": 8,
+          "b_bits": 8,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypeI4I4I32",
+          "value": 15,
+          "description": "Int4 * Int4 -> Int32",
+          "a_bits": 4,
+          "b_bits": 4,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypeI4U4I32",
+          "value": 16,
+          "description": "Int4 * UInt4 -> Int32",
+          "a_bits": 4,
+          "b_bits": 4,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypeU4I4I32",
+          "value": 17,
+          "description": "UInt4 * Int4 -> Int32",
+          "a_bits": 4,
+          "b_bits": 4,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypeU4U4I32",
+          "value": 18,
+          "description": "UInt4 * UInt4 -> Int32",
+          "a_bits": 4,
+          "b_bits": 4,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypemxint4F32",
+          "value": 19,
+          "description": "MXINT4 * MXINT4 -> FP32",
+          "a_bits": 4,
+          "b_bits": 4,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypefp6e3m2F32",
+          "value": 20,
+          "description": "FP6 E3M2 * FP6 E3M2 -> FP32",
+          "a_bits": 8,
+          "b_bits": 8,
+          "c_bits": 32
+        },
+        {
+          "name": "DataTypefp6e2m3F32",
+          "value": 21,
+          "description": "FP6 E2M3 * FP6 E2M3 -> FP32",
+          "a_bits": 8,
+          "b_bits": 8,
+          "c_bits": 32
         }
       ]
     },
@@ -244,6 +316,31 @@
           "rocc_funct": 8,
           "description": "查询 CUTE 宏指令队列目前有多少指令",
           "return_description": "返回FIFO中当前指令状态 (0010 = id为1的位置已有指令)"
+        },
+        {
+          "name": "TRACE_MARK",
+          "funct": 9,
+          "rocc_funct": 9,
+          "description": "Emit a task checkpoint at command acceptance and return its sequence.",
+          "return_description": "Echo seq after the marker has been accepted.",
+          "fields": {
+            "cfgData1": [
+              {
+                "name": "seq",
+                "hi": 63,
+                "lo": 0,
+                "description": "Per-hart task checkpoint sequence."
+              }
+            ],
+            "cfgData2": [
+              {
+                "name": "key",
+                "hi": 63,
+                "lo": 0,
+                "description": "Software task descriptor key."
+              }
+            ]
+          }
         }
       ]
     },
@@ -412,7 +509,7 @@
                 "hi": 7,
                 "lo": 0,
                 "description": "元素数据类型",
-                "max_value": 15,
+                "max_value": 21,
                 "enum_ref": "ElementDataType"
               },
               {
